@@ -147,7 +147,14 @@ done
     suspend fun installPersistent(srcPath: String, fileName: String): Pair<Boolean, String> =
         withContext(Dispatchers.IO) {
             val safeName = if (fileName.endsWith(".kpm")) fileName else fileName + ".kpm"
-            val dest = persistentDir + "/" + safeName
+            // 同名文件已存在时追加序号，避免覆盖已有模块
+            var target = safeName
+            var index = 1
+            while (Shell.cmd("test -e " + quote(persistentDir + "/" + target)).exec().isSuccess && index < 100) {
+                target = safeName.removeSuffix(".kpm") + "_" + index + ".kpm"
+                index++
+            }
+            val dest = persistentDir + "/" + target
             val copy = Shell.cmd(
                 "mkdir -p " + persistentDir +
                     " && cp " + quote(srcPath) + " " + quote(dest) +
