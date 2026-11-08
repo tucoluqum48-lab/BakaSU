@@ -97,7 +97,21 @@ fun KpmScreen() {
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             loading = true
-            val dest = File(context.cacheDir, "kpm_import.kpm")
+            // 取用户所选文件的真实名字，避免都叫 kpm_import.kpm 互相覆盖
+            val displayName = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.query(
+                        uri,
+                        arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                        null, null, null,
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    }
+                }.getOrNull()
+            }?.takeIf { it.isNotBlank() } ?: ("kpm_" + System.currentTimeMillis() + ".kpm")
+
+            val safeName = if (displayName.endsWith(".kpm")) displayName else displayName + ".kpm"
+            val dest = File(context.cacheDir, safeName)
             val copied = withContext(Dispatchers.IO) {
                 runCatching {
                     context.contentResolver.openInputStream(uri)?.use { input ->
