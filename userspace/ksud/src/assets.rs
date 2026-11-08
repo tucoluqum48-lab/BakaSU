@@ -20,7 +20,14 @@ mod android {
     pub fn ensure_susfs_link() -> anyhow::Result<()> {
         let ksu_susfs = KSU_SUSFS;
         let _ = std::fs::remove_file(ksu_susfs);
-        std::fs::hard_link(DAEMON_PATH, ksu_susfs)?;
+        // 硬链接可能已被内核或另一次并发调用创建，EEXIST 视为已就绪即可，
+        // 否则模块安装会以 "Failed to extract assets / File exists" 失败。
+        match std::fs::hard_link(DAEMON_PATH, ksu_susfs) {
+            Ok(()) => {}
+            // 已存在说明链接就绪，不必视为错误
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(e.into()),
+        }
         Ok(())
     }
 
