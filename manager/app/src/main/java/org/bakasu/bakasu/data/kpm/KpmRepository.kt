@@ -53,7 +53,12 @@ class KpmRepository {
 
     suspend fun kernelVersion(): String = exec("kver").firstOrNull()?.trim().orEmpty()
 
-    suspend fun rehookStatus(): String = exec("rehook_status").joinToString(" ").trim()
+    suspend fun rehookStatus(): String {
+        val raw = exec("rehook_status").joinToString(" ").trim()
+        // 原始输出形如 "Rehook syscall status: enabled"，只保留状态值
+        if (raw.isEmpty()) return ""
+        return raw.substringAfterLast(':').trim().ifEmpty { raw }
+    }
 
     suspend fun count(): Int = exec("kpm", "num").firstOrNull()?.trim()?.toIntOrNull() ?: 0
 
