@@ -70,6 +70,8 @@ fun KpmScreen() {
     var modules by remember { mutableStateOf<List<KpmModule>>(emptyList()) }
     var message by remember { mutableStateOf("") }
     var ctlTarget by remember { mutableStateOf<KpmModule?>(null) }
+    var pendingFile by remember { mutableStateOf<File?>(null) }
+    var persistentFiles by remember { mutableStateOf<List<String>>(emptyList()) }
     var ctlArgs by remember { mutableStateOf("") }
 
     fun refresh() {
@@ -82,6 +84,7 @@ fun KpmScreen() {
                 rehook = repo.rehookStatus()
                 modules = repo.listNames().mapNotNull { repo.info(it) }
             }
+            persistentFiles = repo.persistentList()
             loading = false
         }
     }
@@ -101,13 +104,14 @@ fun KpmScreen() {
                     dest.length() > 0
                 }.getOrDefault(false)
             }
-            message = if (!copied) {
-                "读取所选文件失败"
+            if (!copied) {
+                message = "读取所选文件失败"
+                loading = false
+                refresh()
             } else {
-                val result = repo.load(dest.absolutePath)
-                if (result.first) "已加载 " + dest.name else "加载失败：" + result.second
+                pendingFile = dest
+                loading = false
             }
-            refresh()
         }
     }
 
@@ -169,6 +173,39 @@ fun KpmScreen() {
             return@Column
         }
 
+        if (persistentFiles.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp)) {
+                    Text(
+                        "开机自动加载（" + persistentFiles.size + "）",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        "来自 " + repo.persistentDir,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    persistentFiles.forEach { name ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(name, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                            TextButton(onClick = {
+                                scope.launch {
+                                    val r = repo.removePersistent(name)
+                                    message = if (r.first) "已移除自启 " + name else "移除失败：" + r.second
+                                    refresh()
+                                }
+                            }) { Text("移除") }
+                        }
+                    }
+                }
+            }
+        }
+
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(modules) { m ->
                 Card(Modifier.fillMaxWidth()) {
@@ -205,6 +242,47 @@ fun KpmScreen() {
                 }
             }
         }
+    }
+
+    val pending = pendingFile
+    if (pending != null) {
+        AlertDialog(
+            onDismissRequest = {
+                pendingFile = null
+                refresh()
+            },
+            title = { Text("加载方式") },
+            text = {
+                Column {
+                    Text(pending.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(6.dp))
+                    Text("临时加载：仅本次开机有效，重启后消失", fontSize = 12.sp)
+                    Text("开机自动加载：复制到 /data/adb/kp-next/kpm/，以后每次开机自动加载", fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingFile = null
+                    scope.launch {
+                        loading = true
+                        val r = repo.load(pending.absolutePath)
+                        message = if (r.first) "已临时加载 " + pending.name else "加载失败：" + r.second
+                        refresh()
+                    }
+                }) { Text("临时加载") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingFile = null
+                    scope.launch {
+                        loading = true
+                        val r = repo.installPersistent(pending.absolutePath, pending.name)
+                        message = if (r.first) "已加入开机自启 " + pending.name else "失败：" + r.second
+                        refresh()
+                    }
+                }) { Text("开机自动加载") }
+            },
+        )
     }
 
     val target = ctlTarget
