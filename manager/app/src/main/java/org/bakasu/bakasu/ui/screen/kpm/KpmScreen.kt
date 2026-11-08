@@ -323,18 +323,14 @@ fun KpmScreen() {
                     val name = target.name
                     val args = ctlArgs.trim()
                     ctlTarget = null
-                    if (args.isEmpty()) {
-                        message = "参数为空，已取消"
-                    } else {
-                        scope.launch {
-                            val result = repo.ctl0(name, args)
-                            message = if (result.first) {
-                                name + " -> " + result.second.ifEmpty { "已发送" }
-                            } else {
-                                "控制失败：" + result.second
-                            }
-                            refresh()
+                    scope.launch {
+                        val result = repo.ctl0(name, args)
+                        message = if (result.first) {
+                            name + " -> " + result.second.ifEmpty { "已发送（无返回）" }
+                        } else {
+                            "控制失败：" + result.second
                         }
+                        refresh()
                     }
                 }) { Text("确定") }
             },
