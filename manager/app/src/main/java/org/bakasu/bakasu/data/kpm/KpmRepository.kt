@@ -195,7 +195,19 @@ done
         }
 
     suspend fun ctl0(name: String, args: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
-        val r = Shell.cmd(binaryPath + " kpm ctl0 " + quote(name) + " " + args).exec()
-        r.isSuccess to (r.out + r.err).joinToString(" ").trim()
+        // 与 KPatch-Next WebUI 一致：参数整体包双引号并转义，空参数传空串，
+        // 否则带空格的参数会被 shell 拆成多个，模块收到错误内容。
+        val argToken = if (args.isEmpty()) {
+            ""
+        } else {
+            val escaped = args
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("$", "\\$")
+            "\"" + escaped + "\""
+        }
+        val r = Shell.cmd(binaryPath + " kpm ctl0 " + quote(name) + " " + argToken).exec()
+        val text = if (r.isSuccess) r.out else r.err
+        r.isSuccess to text.joinToString(" ").trim()
     }
 }
