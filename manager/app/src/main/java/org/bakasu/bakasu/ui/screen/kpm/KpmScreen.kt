@@ -59,7 +59,8 @@ import org.bakasu.bakasu.ui.navigation.LocalNavigator
 fun KpmScreen() {
     val navigator = LocalNavigator.current
 
-    val repo = remember { KpmRepository() }
+    val appContext = LocalContext.current.applicationContext
+    val repo = remember { KpmRepository(appContext) }
     val scope = rememberCoroutineScope()
 
     var loading by remember { mutableStateOf(true) }
@@ -77,6 +78,7 @@ fun KpmScreen() {
     fun refresh() {
         scope.launch {
             loading = true
+            repo.bootstrap()
             available = repo.isAvailable()
             if (available) {
                 toolVer = repo.toolVersion()
