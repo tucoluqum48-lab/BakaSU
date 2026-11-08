@@ -76,6 +76,7 @@ import org.bakasu.bakasu.ui.navigation.Navigator
 import org.bakasu.bakasu.ui.navigation.Route
 import org.bakasu.bakasu.ui.overscroll.StretchOverscrollCompensationState
 import org.bakasu.bakasu.ui.overscroll.rememberCustomOverscrollFactory
+import org.bakasu.bakasu.ui.screen.kpm.KpmScreen
 import org.bakasu.bakasu.ui.screen.AppProfileScreen
 import org.bakasu.bakasu.ui.screen.AppProfileTemplateScreen
 import org.bakasu.bakasu.ui.screen.DynamicManagerScreen
@@ -335,6 +336,17 @@ fun NavContainer(
             transition = transition,
             effects = effects,
         ) {
+            entry<Route.Kpm>(swipeDismiss = swipeBackDirection) {
+                ManagerNavEntry(
+                    interceptPredictiveBack = interceptPredictiveBack,
+                    onBack = onBack,
+                    themeConfig = themeConfig,
+                    backgroundRenderState = backgroundRenderState,
+                    useBlur = useBlur,
+                ) {
+                    KpmScreen()
+                }
+            }
             entry<Route.About>(swipeDismiss = swipeBackDirection) {
                 ManagerNavEntry(
                     interceptPredictiveBack = interceptPredictiveBack,
