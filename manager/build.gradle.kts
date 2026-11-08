@@ -52,7 +52,8 @@ extra["isPrBuild"] = project.findProperty("IS_PR_BUILD")?.toString()?.toBoolean(
 extra["defaultManagerPackageName"] = "com.resukisu.resukisu"
 extra["managerPackageName"] = project.findProperty("KSU_PACKAGE_NAME")?.toString() ?: extra["defaultManagerPackageName"]
 extra["defaultManagerAppName"] = if (extra["isPrBuild"] == true) "BakaSU PR" else "BakaSU"
-extra["managerName"] = project.findProperty("KSU_NAME")?.toString() ?: extra["defaultManagerAppName"]
+// 应用名固定为 BakaSU（分支构建不再追加 -DEV 后缀；包名仍保留 .dev 以便与官方共存）
+extra["managerName"] = "BakaSU"
 
 val isSpoofedBuild = project.findProperty("IS_SPOOFED_BUILD")?.toString()?.toBoolean() ?: false
 
