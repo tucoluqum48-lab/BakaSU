@@ -2,22 +2,30 @@ package org.bakasu.bakasu.ui.screen.kpm
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.add
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.twotone.Add
-import androidx.compose.material.icons.twotone.Delete
-import androidx.compose.material.icons.twotone.Refresh
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.LargeFlexibleTopAppBar
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.Icons as M3Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberTopAppBarState
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -25,58 +33,34 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import java.io.File
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import org.bakasu.bakasu.data.kpm.KpmModule
 import org.bakasu.bakasu.data.kpm.KpmRepository
-import org.bakasu.bakasu.ui.component.settings.AppBackButton
-import org.bakasu.bakasu.ui.component.settings.SegmentedColumn
-import org.bakasu.bakasu.ui.component.settings.SettingsBaseWidget
-import org.bakasu.bakasu.ui.component.settings.SettingsJumpPageWidget
 import org.bakasu.bakasu.ui.navigation.LocalNavigator
-import org.bakasu.bakasu.ui.util.adaptiveScaffoldWindowInsets
 
 /**
- * KPM 模块管理页：驱动 KPatch-Next 的 kpatch CLI。
- * 模块由内核侧的 KPatch-Next 加载，不依赖管理器内置的 KPM 支持。
+ * KPM 模块管理页：调用 KPatch-Next 的 kpatch CLI，
+ * 与内核是否实现 KernelSU 原生 KPM 超调用无关。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun KpmScreen() {
+    val navigator = LocalNavigator.current
+
     val repo = remember { KpmRepository() }
     val scope = rememberCoroutineScope()
-    val navigator = LocalNavigator.current
+
     val context = LocalContext.current
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior(rememberTopAppBarState())
-
-    var loading by remember { mutableStateOf(true) }
-    var available by remember { mutableStateOf(false) }
-    var toolVer by remember { mutableStateOf("") }
-    var kernelVer by remember { mutableStateOf("") }
-    var rehook by remember { mutableStateOf("") }
-    var modules by remember { mutableStateOf<List<KpmModule>>(emptyList()) }
-    var message by remember { mutableStateOf("") }
-
-    fun refresh() {
-        scope.launch {
-            loading = true
-            available = repo.isAvailable()
-            if (available) {
-                toolVer = repo.toolVersion()
-                kernelVer = repo.kernelVersion()
-                rehook = repo.rehookStatus()
-                modules = repo.listNames().mapNotNull { repo.info(it) }
-            } else {
-                modules = emptyList()
-            }
-            loading = false
-        }
-    }
 
     val pickKpm = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
@@ -101,127 +85,118 @@ fun KpmScreen() {
         }
     }
 
+    var loading by remember { mutableStateOf(true) }
+    var available by remember { mutableStateOf(false) }
+    var toolVer by remember { mutableStateOf("") }
+    var kernelVer by remember { mutableStateOf("") }
+    var rehook by remember { mutableStateOf("") }
+    var modules by remember { mutableStateOf<List<KpmModule>>(emptyList()) }
+    var message by remember { mutableStateOf("") }
+
+    fun refresh() {
+        scope.launch {
+            loading = true
+            available = repo.isAvailable()
+            if (available) {
+                toolVer = repo.toolVersion()
+                kernelVer = repo.kernelVersion()
+                rehook = repo.rehookStatus()
+                modules = repo.listNames().mapNotNull { repo.info(it) }
+            }
+            loading = false
+        }
+    }
+
     LaunchedEffect(Unit) { refresh() }
 
     Scaffold(
-        contentWindowInsets = adaptiveScaffoldWindowInsets(),
         topBar = {
-            LargeFlexibleTopAppBar(
-                windowInsets = TopAppBarDefaults.windowInsets.add(WindowInsets(left = 12.dp)),
-                title = { Text(text = "KPM 模块") },
-                scrollBehavior = scrollBehavior,
+            TopAppBar(
+                title = { Text("KPM 模块") },
                 navigationIcon = {
-                    AppBackButton(onClick = { navigator.pop() })
+                    IconButton(onClick = { navigator.pop() }) {
+                        Icon(M3Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    }
                 },
             )
         },
-        containerColor = MaterialTheme.colorScheme.surface,
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                top = innerPadding.calculateTopPadding() + 5.dp,
-                bottom = innerPadding.calculateBottomPadding() + 24.dp,
-            ),
-        ) {
-            item {
-                SegmentedColumn(title = "运行状态") {
-                    item {
-                        SettingsBaseWidget(
-                            title = "KPatch-Next",
-                            description = if (available) toolVer else "未检测到（内核未打 KPatch 补丁）",
-                        )
-                    }
-                    if (available) {
-                        item {
-                            SettingsBaseWidget(title = "内核版本", description = kernelVer)
-                        }
-                        item {
-                            SettingsBaseWidget(
-                                title = "重挂模式",
-                                description = rehook.ifEmpty { "未知" },
-                            )
-                        }
-                    }
-                }
-            }
+    Column(Modifier.fillMaxSize().padding(16.dp).padding(innerPadding)) {
+        Spacer(Modifier.height(6.dp))
+        val subtitle = if (available) {
+            "KPatch-Next " + toolVer + " · 内核 " + kernelVer + (if (rehook.isNotEmpty()) " · " + rehook else "")
+        } else {
+            "未检测到 KPatch-Next：需要内核包含 KPatch 补丁并安装 KPatch-Next 模块"
+        }
+        Text(
+            subtitle,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontFamily = FontFamily.Monospace,
+        )
+        Spacer(Modifier.height(12.dp))
 
-            item {
-                SegmentedColumn(title = "操作") {
-                    item {
-                        SettingsJumpPageWidget(
-                            icon = Icons.TwoTone.Refresh,
-                            title = "刷新列表",
-                            description = if (loading) "读取中…" else "已加载 " + modules.size + " 个模块",
-                            onClick = { refresh() },
-                        )
-                    }
-                    item {
-                        SettingsJumpPageWidget(
-                            icon = Icons.TwoTone.Add,
-                            title = "加载 .kpm 文件",
-                            description = if (available) "选择本地 .kpm 并加载到内核" else "需要 KPatch-Next",
-                            enabled = available,
-                            onClick = { pickKpm.launch(arrayOf("*/*")) },
-                        )
-                    }
-                }
-            }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("已加载 " + modules.size + " 个", fontSize = 13.sp)
+            Spacer(Modifier.width(12.dp))
+            TextButton(onClick = { refresh() }) { Text("刷新") }
+            Spacer(Modifier.width(4.dp))
+            TextButton(onClick = { pickKpm.launch(arrayOf("*/*")) }) { Text("加载 .kpm") }
+        }
 
-            if (message.isNotEmpty()) {
-                item {
-                    SegmentedColumn(title = "上次操作") {
-                        item {
-                            SettingsBaseWidget(title = null, description = message)
-                        }
-                    }
-                }
-            }
+        if (message.isNotEmpty()) {
+            Text(message, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(8.dp))
+        }
 
-            items(modules.size) { index ->
-                val m = modules[index]
-                SegmentedColumn(title = m.name) {
-                    item {
-                        SettingsBaseWidget(
-                            title = "版本",
-                            description = listOfNotNull(
-                                m.version.ifEmpty { null },
-                                m.license.ifEmpty { null },
-                            ).joinToString(" · ").ifEmpty { "未知" },
-                        )
-                    }
-                    item {
-                        SettingsBaseWidget(title = "作者", description = m.author.ifEmpty { "未知" })
-                    }
-                    item {
-                        SettingsBaseWidget(title = "参数", description = m.args.ifEmpty { "(null)" })
-                    }
-                    if (m.description.isNotEmpty()) {
-                        item {
-                            SettingsBaseWidget(title = "说明", description = m.description)
+        if (loading) {
+            Row(Modifier.fillMaxWidth().padding(24.dp), horizontalArrangement = Arrangement.Center) {
+                CircularProgressIndicator()
+            }
+            return@Column
+        }
+
+        if (!available) {
+            Text(
+                "本页只是一个命令行封装：模块由内核侧的 KPatch-Next 加载，不经过管理器。",
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@Column
+        }
+
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(modules) { m ->
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text(m.name, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(4.dp))
+                        val meta = listOfNotNull(
+                            if (m.version.isNotEmpty()) "版本 " + m.version else null,
+                            if (m.author.isNotEmpty()) "作者 " + m.author else null,
+                            if (m.args.isNotEmpty()) "参数 " + m.args else null,
+                        ).joinToString(" · ")
+                        if (meta.isNotEmpty()) {
+                            Text(meta, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                    }
-                    item {
-                        SettingsJumpPageWidget(
-                            icon = Icons.TwoTone.Delete,
-                            title = "卸载",
-                            description = "从内核中移除该模块",
-                            isError = true,
-                            onClick = {
+                        if (m.description.isNotEmpty()) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(m.description, fontSize = 13.sp)
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Row {
+                            OutlinedButton(onClick = {
                                 scope.launch {
                                     val result = repo.unload(m.name)
-                                    message = if (result.first) {
-                                        "已卸载 " + m.name
-                                    } else {
-                                        "卸载失败：" + result.second
-                                    }
+                                    message = if (result.first) "已卸载 " + m.name else "卸载失败：" + result.second
                                     refresh()
                                 }
-                            },
-                        )
+                            }) { Text("卸载") }
+                        }
                     }
                 }
             }
         }
+    }
     }
 }
