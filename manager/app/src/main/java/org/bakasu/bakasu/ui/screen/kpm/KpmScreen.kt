@@ -60,6 +60,28 @@ fun KpmScreen() {
     val repo = remember { KpmRepository() }
     val scope = rememberCoroutineScope()
 
+    var loading by remember { mutableStateOf(true) }
+    var available by remember { mutableStateOf(false) }
+    var toolVer by remember { mutableStateOf("") }
+    var kernelVer by remember { mutableStateOf("") }
+    var rehook by remember { mutableStateOf("") }
+    var modules by remember { mutableStateOf<List<KpmModule>>(emptyList()) }
+    var message by remember { mutableStateOf("") }
+
+    fun refresh() {
+        scope.launch {
+            loading = true
+            available = repo.isAvailable()
+            if (available) {
+                toolVer = repo.toolVersion()
+                kernelVer = repo.kernelVersion()
+                rehook = repo.rehookStatus()
+                modules = repo.listNames().mapNotNull { repo.info(it) }
+            }
+            loading = false
+        }
+    }
+
     val context = LocalContext.current
 
     val pickKpm = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -82,28 +104,6 @@ fun KpmScreen() {
                 if (result.first) "已加载 " + dest.name else "加载失败：" + result.second
             }
             refresh()
-        }
-    }
-
-    var loading by remember { mutableStateOf(true) }
-    var available by remember { mutableStateOf(false) }
-    var toolVer by remember { mutableStateOf("") }
-    var kernelVer by remember { mutableStateOf("") }
-    var rehook by remember { mutableStateOf("") }
-    var modules by remember { mutableStateOf<List<KpmModule>>(emptyList()) }
-    var message by remember { mutableStateOf("") }
-
-    fun refresh() {
-        scope.launch {
-            loading = true
-            available = repo.isAvailable()
-            if (available) {
-                toolVer = repo.toolVersion()
-                kernelVer = repo.kernelVersion()
-                rehook = repo.rehookStatus()
-                modules = repo.listNames().mapNotNull { repo.info(it) }
-            }
-            loading = false
         }
     }
 
