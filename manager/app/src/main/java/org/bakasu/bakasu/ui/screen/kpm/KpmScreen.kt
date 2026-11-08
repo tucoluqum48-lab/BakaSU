@@ -23,6 +23,8 @@ import androidx.compose.material.icons.Icons as M3Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -67,6 +69,8 @@ fun KpmScreen() {
     var rehook by remember { mutableStateOf("") }
     var modules by remember { mutableStateOf<List<KpmModule>>(emptyList()) }
     var message by remember { mutableStateOf("") }
+    var ctlTarget by remember { mutableStateOf<KpmModule?>(null) }
+    var ctlArgs by remember { mutableStateOf("") }
 
     fun refresh() {
         scope.launch {
@@ -184,7 +188,11 @@ fun KpmScreen() {
                             Text(m.description, fontSize = 13.sp)
                         }
                         Spacer(Modifier.height(8.dp))
-                        Row {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = {
+                                ctlTarget = m
+                                ctlArgs = ""
+                            }) { Text("控制") }
                             OutlinedButton(onClick = {
                                 scope.launch {
                                     val result = repo.unload(m.name)
@@ -197,6 +205,49 @@ fun KpmScreen() {
                 }
             }
         }
+    }
+
+    val target = ctlTarget
+    if (target != null) {
+        AlertDialog(
+            onDismissRequest = { ctlTarget = null },
+            title = { Text("控制 " + target.name) },
+            text = {
+                Column {
+                    Text("输入控制参数（等价于 kpatch kpm ctl0）", fontSize = 12.sp)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = ctlArgs,
+                        onValueChange = { ctlArgs = it },
+                        singleLine = true,
+                        label = { Text("参数") },
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val name = target.name
+                    val args = ctlArgs.trim()
+                    ctlTarget = null
+                    if (args.isEmpty()) {
+                        message = "参数为空，已取消"
+                    } else {
+                        scope.launch {
+                            val result = repo.ctl0(name, args)
+                            message = if (result.first) {
+                                name + " -> " + result.second.ifEmpty { "已发送" }
+                            } else {
+                                "控制失败：" + result.second
+                            }
+                            refresh()
+                        }
+                    }
+                }) { Text("确定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { ctlTarget = null }) { Text("取消") }
+            },
+        )
     }
     }
 }
