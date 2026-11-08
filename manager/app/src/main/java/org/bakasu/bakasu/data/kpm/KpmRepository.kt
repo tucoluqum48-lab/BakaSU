@@ -32,10 +32,12 @@ class KpmRepository(private val context: android.content.Context) {
         val FALLBACK_BIN = "/data/adb/modules/KPatch-Next/bin/kpatch"
     }
 
-    val binaryPath: String get() {
-        val self = File(BIN_DIR, "kpatch")
-        return if (self.exists()) self.absolutePath else FALLBACK_BIN
-    }
+    /**
+     * 注意：/data/adb/kpm-tool 是 0700，App 进程无法 stat，
+     * 所以这里不能做 exists() 判断，直接用固定路径，
+     * 是否存在由 shell 侧（root）判断。
+     */
+    val binaryPath: String get() = BIN_DIR + "/kpatch"
 
     private val bootScriptBody: String = """
 #!/system/bin/sh
@@ -55,7 +57,9 @@ done
     suspend fun bootstrap(): Boolean = withContext(Dispatchers.IO) {
         runCatching {
             val bin = File(BIN_DIR, "kpatch")
-            if (!bin.exists()) {
+            // App 无法 stat /data/adb 下的 700 目录，交给 shell 判断
+            val alreadyDeployed = Shell.cmd("test -x " + quote(bin.absolutePath)).exec().isSuccess
+            if (!alreadyDeployed) {
                 val cache = File(context.cacheDir, "kpatch")
                 context.assets.open(ASSET_NAME).use { input ->
                     cache.outputStream().use { output -> input.copyTo(output) }
