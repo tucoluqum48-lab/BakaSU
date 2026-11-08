@@ -37,18 +37,16 @@ class KpmRepository(private val context: android.content.Context) {
         return if (self.exists()) self.absolutePath else FALLBACK_BIN
     }
 
-    private val bootScriptBody = """
-        #!/system/bin/sh
-        # 由 BakaSU 的 KPM 页面生成：开机自动加载 /data/adb/kpm-tool/kpm/*.kpm
-        KPNDIR=/data/adb/kpm-tool
-        KPATCH="$KPNDIR/bin/kpatch"
-        [ -x "$KPATCH" ] || exit 0
-        until [ "$(getprop sys.boot_completed)" = "1" ]; do sleep 1; done
-        for kpm in "$KPNDIR"/kpm/*.kpm; do
-            [ -s "$kpm" ] || continue
-            "$KPATCH" kpm load "$kpm" >> "$KPNDIR/autoload.log" 2>&1
-        done
-    """.trimIndent()
+    private val bootScriptBody: String = """
+#!/system/bin/sh
+# 由 BakaSU 的 KPM 页面生成：开机自动加载 /data/adb/kpm-tool/kpm/*.kpm
+[ -x /data/adb/kpm-tool/bin/kpatch ] || exit 0
+until [ "${'$'}(getprop sys.boot_completed)" = "1" ]; do sleep 1; done
+for f in /data/adb/kpm-tool/kpm/*.kpm; do
+    [ -s "${'$'}f" ] || continue
+    /data/adb/kpm-tool/bin/kpatch kpm load "${'$'}f" >> /data/adb/kpm-tool/autoload.log 2>&1
+done
+""".trimIndent()
 
     /**
      * 首次运行时把 kpatch 释放到 /data/adb/kpm-tool/bin，
