@@ -559,6 +559,24 @@ fun SettingsPage(bottomPadding: Dp) {
                 }
             }
 
+            // KPM 模块（KPatch-Next）
+            item {
+                SegmentedColumn(
+                    title = "KPM 模块",
+                    content = {
+                        item {
+                            SettingsJumpPageWidget(
+                                icon = Icons.TwoTone.Extension,
+                                title = "KPM 模块管理",
+                                onClick = {
+                                    navigator.push(Route.Kpm)
+                                },
+                            )
+                        }
+                    },
+                )
+            }
+
             // 关于卡片
             item {
                 SegmentedColumn(
