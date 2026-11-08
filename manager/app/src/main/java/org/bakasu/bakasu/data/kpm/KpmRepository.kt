@@ -83,6 +83,38 @@ class KpmRepository {
         )
     }
 
+    /** 开机自启目录：service.sh 会遍历这里面的 .kpm 逐个加载 */
+    val persistentDir = "/data/adb/kp-next/kpm"
+
+    suspend fun persistentList(): List<String> = withContext(Dispatchers.IO) {
+        val r = Shell.cmd("ls -1 " + persistentDir + " 2>/dev/null").exec()
+        r.out.map { it.trim() }.filter { it.endsWith(".kpm") }
+    }
+
+    /**
+     * 开机自动加载：把 .kpm 复制进自启目录并立刻加载一次。
+     * 下次开机由 KPatch-Next 的 service.sh 自动加载。
+     */
+    suspend fun installPersistent(srcPath: String, fileName: String): Pair<Boolean, String> =
+        withContext(Dispatchers.IO) {
+            val safeName = if (fileName.endsWith(".kpm")) fileName else fileName + ".kpm"
+            val dest = persistentDir + "/" + safeName
+            val copy = Shell.cmd(
+                "mkdir -p " + persistentDir +
+                    " && cp " + quote(srcPath) + " " + quote(dest) +
+                    " && chmod 644 " + quote(dest),
+            ).exec()
+            if (!copy.isSuccess) return@withContext false to copy.err.joinToString(" ").trim()
+            val load = Shell.cmd(binaryPath + " kpm load " + quote(dest)).exec()
+            load.isSuccess to (if (load.isSuccess) dest else (load.out + load.err).joinToString(" ").trim())
+        }
+
+    suspend fun removePersistent(name: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        val dest = persistentDir + "/" + name
+        val r = Shell.cmd("rm -f " + quote(dest)).exec()
+        r.isSuccess to (r.out + r.err).joinToString(" ").trim()
+    }
+
     suspend fun unload(name: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
         val r = Shell.cmd(binaryPath + " kpm unload " + quote(name)).exec()
         r.isSuccess to (r.out + r.err).joinToString(" ").trim()
