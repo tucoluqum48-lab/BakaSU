@@ -43,7 +43,8 @@ extra["androidBuildToolsVersion"] = "36.1.0"
 extra["androidCompileNdkVersion"] = libs.versions.ndk.get()
 extra["androidSourceCompatibility"] = JavaVersion.VERSION_21
 extra["androidTargetCompatibility"] = JavaVersion.VERSION_21
-extra["managerVersionCode"] = 30000 + getGitCommitCount() + 700
+// 与现有内核驱动 35257 保持一致，避免管理器判定"未安装"
+extra["managerVersionCode"] = 35257
 extra["managerVersionName"] = getGitDescribe()
 extra["isPrBuild"] = project.findProperty("IS_PR_BUILD")?.toString()?.toBoolean() ?: false
 extra["defaultManagerPackageName"] = "com.resukisu.resukisu"
