@@ -235,7 +235,11 @@ private fun StatusBar(
                 )
             }
             Spacer(Modifier.height(4.dp))
-            val caps = (status?.enabledFeatures ?: "").split(" ").filter { it.isNotBlank() }
+            val caps = (status?.enabledFeatures ?: "")
+                .lines()
+                .flatMap { it.split(' ') }
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
