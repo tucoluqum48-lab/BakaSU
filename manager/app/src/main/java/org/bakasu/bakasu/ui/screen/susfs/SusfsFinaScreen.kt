@@ -686,9 +686,7 @@ private fun ExtTab(
                                 kstatPath = ""
                             }
                         }) { Text("FullClone") }
-                        TextButton(onClick = {
-                            if (kstatPath.isNotBlank()) showStatic = true
-                        }) { Text("静态字段…") }
+                        TextButton(onClick = { showStatic = true }) { Text("静态字段…") }
                     }
                     val items = config?.sus_kstat?.toList() ?: emptyList()
                     if (items.isEmpty()) {
@@ -726,7 +724,21 @@ private fun ExtTab(
                         .heightIn(max = 420.dp)
                         .verticalScroll(rememberScrollState()),
                 ) {
-                    Text("留空表示不伪造，路径 = " + kstatPath, fontSize = 12.sp)
+                    OutlinedTextField(
+                        value = kstatPath,
+                        onValueChange = { kstatPath = it },
+                        label = { Text("要伪装的路径（必填）") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = if (kstatPath.isBlank()) "请先填写路径，其余字段留空表示不伪造"
+                        else "路径 = " + kstatPath + "，字段留空表示不伪造",
+                        fontSize = 12.sp,
+                        color = if (kstatPath.isBlank()) MaterialTheme.colorScheme.error
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                     Spacer(Modifier.height(8.dp))
                     STATIC_FIELDS.forEach { (key, label) ->
                         OutlinedTextField(
@@ -741,7 +753,9 @@ private fun ExtTab(
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
+                TextButton(
+                    enabled = kstatPath.isNotBlank(),
+                    onClick = {
                     val values = SusKstatStatically(
                         ino = staticValues["ino"]?.toLongOrNull(),
                         dev = staticValues["dev"]?.toLongOrNull(),
@@ -760,7 +774,8 @@ private fun ExtTab(
                     onAddKstat(kstatPath.trim(), values)
                     staticValues.clear()
                     kstatPath = ""
-                }) { Text("添加") }
+                    },
+                ) { Text("添加") }
             },
             dismissButton = {
                 TextButton(onClick = { showStatic = false }) { Text("取消") }
