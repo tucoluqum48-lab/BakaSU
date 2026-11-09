@@ -318,14 +318,12 @@ private fun SpoofTab(
             onDismissRequest = { confirmUname = false },
             title = { Text("确认修改 uname？") },
             text = {
-                Text(
-                    "release = " + release + "
-version = " + version +
-                        "
-
-修改后部分应用可能读取到伪造的内核版本，建议修改后重启一次。",
-                    fontSize = 13.sp,
-                )
+                Column {
+                    Text("release = " + release, fontSize = 13.sp)
+                    Text("version = " + version, fontSize = 13.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text("修改后部分应用可能读取到伪造的内核版本，建议修改后重启一次。", fontSize = 13.sp)
+                }
             },
             confirmButton = {
                 TextButton(onClick = {
