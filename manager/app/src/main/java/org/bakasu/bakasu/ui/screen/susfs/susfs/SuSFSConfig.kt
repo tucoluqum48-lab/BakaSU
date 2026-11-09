@@ -79,7 +79,7 @@ private class SuSFSConfigSubpage(
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun SuSFSConfigScreen() {
+fun LegacySuSFSConfigScreen() {
     val themeConfig: ThemeConfig = koinInject()
     val cardConfig: CardConfig = koinInject()
     val configHelper = koinViewModel<SuSFSViewModel>()
@@ -351,4 +351,9 @@ fun SuSFSConfigScreen() {
             }
         }
     }
+}
+
+@Composable
+fun SuSFSConfigScreen() {
+    SusfsFinaScreen()
 }
