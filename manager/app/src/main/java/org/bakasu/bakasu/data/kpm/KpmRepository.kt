@@ -57,10 +57,10 @@ class KpmRepository(private val context: android.content.Context) {
 #!/system/bin/sh
 # 由 BakaSU 的 KPM 页面生成：开机自动加载 /data/adb/kpm-tool/kpm/*.kpm
 [ -x /data/adb/kpm-tool/bin/kpatch ] || exit 0
-until [ "$(getprop sys.boot_completed)" = "1" ]; do sleep 1; done
+until [ "${'$'}(getprop sys.boot_completed)" = "1" ]; do sleep 1; done
 for f in /data/adb/kpm-tool/kpm/*.kpm; do
-    [ -s "$f" ] || continue
-    /data/adb/kpm-tool/bin/kpatch kpm load "$f" >> /data/adb/kpm-tool/autoload.log 2>&1
+    [ -s "${'$'}f" ] || continue
+    /data/adb/kpm-tool/bin/kpatch kpm load "${'$'}f" >> /data/adb/kpm-tool/autoload.log 2>&1
 done
 """.trimIndent()
 
