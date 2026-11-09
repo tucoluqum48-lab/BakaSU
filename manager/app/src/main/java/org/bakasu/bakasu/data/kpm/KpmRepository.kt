@@ -28,11 +28,14 @@ class KpmRepository(private val context: android.content.Context) {
         const val BOOT_SCRIPT = "/data/adb/service.d/99-kpm-autoload.sh"
         const val ASSET_NAME = "kpatch-arm64"
 
+        /** 模块路径：仅作为自举前的兜底 */
+        val FALLBACK_BIN = "/data/adb/modules/KPatch-Next/bin/kpatch"
+
         /** 自理目录：管理器自举释放的 kpatch，优先使用 */
-        const val SELF_MANAGED_BIN = "/data/adb/kpm-tool/bin/kpatch"
+        const val SELF_MANAGED_BIN = BIN_DIR + "/kpatch"
 
         val CANDIDATE_DIRS = listOf(
-            "/data/adb/kpm-tool/bin",
+            BIN_DIR,
             "/data/adb/modules/KPatch-Next/bin",
             "/data/adb/kp-next/bin",
             "/data/adb/kpm/bin",
@@ -40,16 +43,19 @@ class KpmRepository(private val context: android.content.Context) {
     }
 
     /**
-     * 注意：/data/adb/kpm-tool 权限是 0700，App 进程 stat 不到，
-     * 所以自理目录必须先交给 root shell 判断，不能直接 File.exists()。
+     * 注意：/data/adb/kpm-tool 是 0700，App 进程无法 stat，
+     * 所以这里不能做 exists() 判断，直接用固定路径，
+     * 是否存在由 shell 侧（root）判断。
      */
     val binaryPath: String by lazy {
+        // /data/adb/kpm-tool 是 0700，App 进程 stat 不到，先交给 root shell 探测，
+        // 命中自理目录就用它，否则回退到 KPatch-Next 模块路径。
         val probe = Shell.cmd("test -x " + SELF_MANAGED_BIN + " && echo KPM_OK").exec()
         if (probe.out.any { it.trim() == "KPM_OK" }) {
             SELF_MANAGED_BIN
         } else {
             CANDIDATE_DIRS.map { File(it, "kpatch") }.firstOrNull { it.exists() }?.absolutePath
-                ?: "/data/adb/modules/KPatch-Next/bin/kpatch"
+                ?: FALLBACK_BIN
         }
     }
 
@@ -65,13 +71,13 @@ done
 """.trimIndent()
 
     /**
-     * 首次运行时把 APK 内置的 kpatch 释放到 /data/adb/kpm-tool/bin，
-     * 并写好开机自动加载脚本，从此不再依赖 KPatch-Next 模块。
+     * 首次运行时把 kpatch 释放到 /data/adb/kpm-tool/bin，
+     * 并写好开机加载脚本，从此不再依赖 KPatch-Next 模块。
      */
     suspend fun bootstrap(): Boolean = withContext(Dispatchers.IO) {
         runCatching {
             val bin = File(BIN_DIR, "kpatch")
-            // App 无法 stat /data/adb 下的 0700 目录，交给 shell 判断
+            // App 无法 stat /data/adb 下的 700 目录，交给 shell 判断
             val alreadyDeployed = Shell.cmd("test -x " + quote(bin.absolutePath)).exec().isSuccess
             if (!alreadyDeployed) {
                 val cache = File(context.cacheDir, "kpatch")
@@ -146,6 +152,45 @@ done
         )
     }
 
+    /** 开机自启目录：由本 App 写的 service.d 脚本负责加载 */
+    val persistentDir: String get() = KPM_DIR
+
+    suspend fun persistentList(): List<String> = withContext(Dispatchers.IO) {
+        val r = Shell.cmd("ls -1 " + persistentDir + " 2>/dev/null").exec()
+        r.out.map { it.trim() }.filter { it.endsWith(".kpm") }
+    }
+
+    /**
+     * 开机自动加载：把 .kpm 复制进自启目录并立刻加载一次。
+     * 下次开机由 KPatch-Next 的 service.sh 自动加载。
+     */
+    suspend fun installPersistent(srcPath: String, fileName: String): Pair<Boolean, String> =
+        withContext(Dispatchers.IO) {
+            val safeName = if (fileName.endsWith(".kpm")) fileName else fileName + ".kpm"
+            // 同名文件已存在时追加序号，避免覆盖已有模块
+            var target = safeName
+            var index = 1
+            while (Shell.cmd("test -e " + quote(persistentDir + "/" + target)).exec().isSuccess && index < 100) {
+                target = safeName.removeSuffix(".kpm") + "_" + index + ".kpm"
+                index++
+            }
+            val dest = persistentDir + "/" + target
+            val copy = Shell.cmd(
+                "mkdir -p " + persistentDir +
+                    " && cp " + quote(srcPath) + " " + quote(dest) +
+                    " && chmod 644 " + quote(dest),
+            ).exec()
+            if (!copy.isSuccess) return@withContext false to copy.err.joinToString(" ").trim()
+            val load = Shell.cmd(binaryPath + " kpm load " + quote(dest)).exec()
+            load.isSuccess to (if (load.isSuccess) dest else (load.out + load.err).joinToString(" ").trim())
+        }
+
+    suspend fun removePersistent(name: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        val dest = persistentDir + "/" + name
+        val r = Shell.cmd("rm -f " + quote(dest)).exec()
+        r.isSuccess to (r.out + r.err).joinToString(" ").trim()
+    }
+
     suspend fun unload(name: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
         val r = Shell.cmd(binaryPath + " kpm unload " + quote(name)).exec()
         r.isSuccess to (r.out + r.err).joinToString(" ").trim()
@@ -170,7 +215,19 @@ done
         }
 
     suspend fun ctl0(name: String, args: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
-        val r = Shell.cmd(binaryPath + " kpm ctl0 " + quote(name) + " " + args).exec()
-        r.isSuccess to (r.out + r.err).joinToString(" ").trim()
+        // 与 KPatch-Next WebUI 一致：参数整体包双引号并转义，空参数传空串，
+        // 否则带空格的参数会被 shell 拆成多个，模块收到错误内容。
+        val argToken = if (args.isEmpty()) {
+            ""
+        } else {
+            val escaped = args
+                .replace("\\", "\\\\")
+                .replace("\"", "\\\"")
+                .replace("$", "\\$")
+            "\"" + escaped + "\""
+        }
+        val r = Shell.cmd(binaryPath + " kpm ctl0 " + quote(name) + " " + argToken).exec()
+        val text = if (r.isSuccess) r.out else r.err
+        r.isSuccess to text.joinToString(" ").trim()
     }
 }

@@ -23,6 +23,8 @@ import androidx.compose.material.icons.Icons as M3Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -68,11 +70,14 @@ fun KpmScreen() {
     var rehook by remember { mutableStateOf("") }
     var modules by remember { mutableStateOf<List<KpmModule>>(emptyList()) }
     var message by remember { mutableStateOf("") }
+    var ctlTarget by remember { mutableStateOf<KpmModule?>(null) }
+    var pendingFile by remember { mutableStateOf<File?>(null) }
+    var persistentFiles by remember { mutableStateOf<List<String>>(emptyList()) }
+    var ctlArgs by remember { mutableStateOf("") }
 
     fun refresh() {
         scope.launch {
             loading = true
-            // 首次运行释放内置 kpatch + 写开机自动加载脚本
             repo.bootstrap()
             available = repo.isAvailable()
             if (available) {
@@ -81,6 +86,7 @@ fun KpmScreen() {
                 rehook = repo.rehookStatus()
                 modules = repo.listNames().mapNotNull { repo.info(it) }
             }
+            persistentFiles = repo.persistentList()
             loading = false
         }
     }
@@ -91,7 +97,21 @@ fun KpmScreen() {
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             loading = true
-            val dest = File(context.cacheDir, "kpm_import.kpm")
+            // 取用户所选文件的真实名字，避免都叫 kpm_import.kpm 互相覆盖
+            val displayName = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.contentResolver.query(
+                        uri,
+                        arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                        null, null, null,
+                    )?.use { cursor ->
+                        if (cursor.moveToFirst()) cursor.getString(0) else null
+                    }
+                }.getOrNull()
+            }?.takeIf { it.isNotBlank() } ?: ("kpm_" + System.currentTimeMillis() + ".kpm")
+
+            val safeName = if (displayName.endsWith(".kpm")) displayName else displayName + ".kpm"
+            val dest = File(context.cacheDir, safeName)
             val copied = withContext(Dispatchers.IO) {
                 runCatching {
                     context.contentResolver.openInputStream(uri)?.use { input ->
@@ -100,13 +120,14 @@ fun KpmScreen() {
                     dest.length() > 0
                 }.getOrDefault(false)
             }
-            message = if (!copied) {
-                "读取所选文件失败"
+            if (!copied) {
+                message = "读取所选文件失败"
+                loading = false
+                refresh()
             } else {
-                val result = repo.load(dest.absolutePath)
-                if (result.first) "已加载 " + dest.name else "加载失败：" + result.second
+                pendingFile = dest
+                loading = false
             }
-            refresh()
         }
     }
 
@@ -168,6 +189,39 @@ fun KpmScreen() {
             return@Column
         }
 
+        if (persistentFiles.isNotEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(14.dp)) {
+                    Text(
+                        "开机自动加载（" + persistentFiles.size + "）",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        "来自 " + repo.persistentDir,
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    persistentFiles.forEach { name ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(name, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                            TextButton(onClick = {
+                                scope.launch {
+                                    val r = repo.removePersistent(name)
+                                    message = if (r.first) "已移除自启 " + name else "移除失败：" + r.second
+                                    refresh()
+                                }
+                            }) { Text("移除") }
+                        }
+                    }
+                }
+            }
+        }
+
         LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             items(modules) { m ->
                 Card(Modifier.fillMaxWidth()) {
@@ -187,7 +241,11 @@ fun KpmScreen() {
                             Text(m.description, fontSize = 13.sp)
                         }
                         Spacer(Modifier.height(8.dp))
-                        Row {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = {
+                                ctlTarget = m
+                                ctlArgs = ""
+                            }) { Text("控制") }
                             OutlinedButton(onClick = {
                                 scope.launch {
                                     val result = repo.unload(m.name)
@@ -200,6 +258,86 @@ fun KpmScreen() {
                 }
             }
         }
+    }
+
+    val pending = pendingFile
+    if (pending != null) {
+        AlertDialog(
+            onDismissRequest = {
+                pendingFile = null
+                refresh()
+            },
+            title = { Text("加载方式") },
+            text = {
+                Column {
+                    Text(pending.name, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(6.dp))
+                    Text("临时加载：仅本次开机有效，重启后消失", fontSize = 12.sp)
+                    Text("开机自动加载：复制到 /data/adb/kp-next/kpm/，以后每次开机自动加载", fontSize = 12.sp)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingFile = null
+                    scope.launch {
+                        loading = true
+                        val r = repo.load(pending.absolutePath)
+                        message = if (r.first) "已临时加载 " + pending.name else "加载失败：" + r.second
+                        refresh()
+                    }
+                }) { Text("临时加载") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    pendingFile = null
+                    scope.launch {
+                        loading = true
+                        val r = repo.installPersistent(pending.absolutePath, pending.name)
+                        message = if (r.first) "已加入开机自启 " + pending.name else "失败：" + r.second
+                        refresh()
+                    }
+                }) { Text("开机自动加载") }
+            },
+        )
+    }
+
+    val target = ctlTarget
+    if (target != null) {
+        AlertDialog(
+            onDismissRequest = { ctlTarget = null },
+            title = { Text("控制 " + target.name) },
+            text = {
+                Column {
+                    Text("输入控制参数（等价于 kpatch kpm ctl0）", fontSize = 12.sp)
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = ctlArgs,
+                        onValueChange = { ctlArgs = it },
+                        singleLine = true,
+                        label = { Text("参数") },
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val name = target.name
+                    val args = ctlArgs.trim()
+                    ctlTarget = null
+                    scope.launch {
+                        val result = repo.ctl0(name, args)
+                        message = if (result.first) {
+                            name + " -> " + result.second.ifEmpty { "已发送（无返回）" }
+                        } else {
+                            "控制失败：" + result.second
+                        }
+                        refresh()
+                    }
+                }) { Text("确定") }
+            },
+            dismissButton = {
+                TextButton(onClick = { ctlTarget = null }) { Text("取消") }
+            },
+        )
     }
     }
 }
