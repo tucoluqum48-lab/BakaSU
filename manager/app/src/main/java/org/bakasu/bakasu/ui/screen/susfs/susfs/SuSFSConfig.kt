@@ -51,6 +51,7 @@ import org.bakasu.bakasu.ui.component.settings.AppBackButton
 import org.bakasu.bakasu.ui.navigation.LocalNavigator
 import org.bakasu.bakasu.ui.screen.susfs.subpages.OpenRedirectTab
 import org.bakasu.bakasu.ui.screen.susfs.subpages.StandardFeaturesTab
+import org.bakasu.bakasu.ui.screen.susfs.subpages.DashboardTab
 import org.bakasu.bakasu.ui.screen.susfs.subpages.StatusTab
 import org.bakasu.bakasu.ui.screen.susfs.subpages.SusKstatTab
 import org.bakasu.bakasu.ui.screen.susfs.subpages.SusMapTab
@@ -136,6 +137,16 @@ fun SuSFSConfigScreen() {
     }
 
     val subpages = listOf(
+        SuSFSConfigSubpage(
+            requirePersist = false,
+            title = "总览",
+        ) { innerPadding, nestedScrollConnection ->
+            DashboardTab(
+                nestedScrollConnection = nestedScrollConnection,
+                innerPadding = innerPadding,
+                onRegisterRefresh = onRegisterRefresh,
+            )
+        },
         SuSFSConfigSubpage(
             requirePersist = false,
             title = stringResource(R.string.susfs_tab_status),
