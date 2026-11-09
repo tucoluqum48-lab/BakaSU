@@ -59,9 +59,11 @@ fun getGitCommitCount(): Int = providers.exec {
 }.standardOutput.asText.get().trim().toInt()
 
 fun getGitDescribe(): String {
-    val desc = providers.exec {
+    val raw = providers.exec {
         commandLine("git", "describe", "--tags", "--always", "--abbrev=0")
     }.standardOutput.asText.get().trim()
+    // 无 tag 时 git describe 会回退成裸 commit sha，界面上显示成乱码版本号
+    val desc = if (raw.matches(Regex("^[0-9a-f]{7,40}$"))) "v4.2.0-rc3" else raw
     if (isSpoofedBuild) {
         return "$desc-spoofed"
     }
