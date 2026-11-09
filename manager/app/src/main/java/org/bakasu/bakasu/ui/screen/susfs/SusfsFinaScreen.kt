@@ -1,5 +1,7 @@
 package org.bakasu.bakasu.ui.screen.susfs
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -70,6 +72,7 @@ fun SusfsFinaScreen() {
     var status by remember { mutableStateOf<SuSFSStatusInfo?>(null) }
     var tab by remember { mutableStateOf(0) }
     var busy by remember { mutableStateOf(false) }
+    var capExpanded by remember { mutableStateOf(false) }
 
     fun notify(msg: String) {
         scope.launch { snackbar.showReplacingSnackbar(msg) }
@@ -108,7 +111,13 @@ fun SusfsFinaScreen() {
         containerColor = MaterialTheme.colorScheme.surface,
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            StatusBar(config = config, status = status, busy = busy)
+            StatusBar(
+                config = config,
+                status = status,
+                busy = busy,
+                capExpanded = capExpanded,
+                onToggleCaps = { capExpanded = !capExpanded },
+            )
             PrimaryTabRow(selectedTabIndex = tab) {
                 ABI_ORDER.forEachIndexed { index, title ->
                     Tab(
@@ -199,7 +208,13 @@ fun SusfsFinaScreen() {
 }
 
 @Composable
-private fun StatusBar(config: SuSFSConfig?, status: SuSFSStatusInfo?, busy: Boolean) {
+private fun StatusBar(
+    config: SuSFSConfig?,
+    status: SuSFSStatusInfo?,
+    busy: Boolean,
+    capExpanded: Boolean,
+    onToggleCaps: () -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
@@ -220,12 +235,31 @@ private fun StatusBar(config: SuSFSConfig?, status: SuSFSStatusInfo?, busy: Bool
                 )
             }
             Spacer(Modifier.height(4.dp))
-            Text(
-                text = "能力: " + (status?.enabledFeatures?.ifBlank { "未知" } ?: "未知"),
-                fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            val caps = (status?.enabledFeatures ?: "").split(" ").filter { it.isNotBlank() }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "能力: " + caps.size + " 项",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                TextButton(onClick = onToggleCaps) {
+                    Text(if (capExpanded) "收起" else "展开", fontSize = 11.sp)
+                }
+            }
+            if (capExpanded) {
+                caps.forEach { cap ->
+                    Text(
+                        text = cap.removePrefix("CONFIG_KSU_SUSFS_"),
+                        fontSize = 11.sp,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
             Text(
                 text = "条目: 路径 " + (config?.sus_path?.size ?: 0) +
                     " / 映射 " + (config?.sus_map?.size ?: 0) +
@@ -452,7 +486,10 @@ private fun RedirectTab(
                 )
                 Spacer(Modifier.height(6.dp))
                 Text("UID 方案", fontSize = 12.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     UidScheme.entries.forEach { s ->
                         TextButton(onClick = { scheme = s }) {
                             Text(
