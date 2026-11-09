@@ -21,16 +21,29 @@ data class KpmModule(
 class KpmRepository {
 
     private companion object {
+        /** 自理目录：管理器自举释放的 kpatch，优先使用 */
+        const val SELF_MANAGED_BIN = "/data/adb/kpm-tool/bin/kpatch"
+
         val CANDIDATE_DIRS = listOf(
+            "/data/adb/kpm-tool/bin",
             "/data/adb/modules/KPatch-Next/bin",
             "/data/adb/kp-next/bin",
             "/data/adb/kpm/bin",
         )
     }
 
+    /**
+     * 注意：/data/adb/kpm-tool 权限是 0700，App 进程 stat 不到，
+     * 所以自理目录必须先交给 root shell 判断，不能直接 File.exists()。
+     */
     val binaryPath: String by lazy {
-        CANDIDATE_DIRS.map { File(it, "kpatch") }.firstOrNull { it.exists() }?.absolutePath
-            ?: "/data/adb/modules/KPatch-Next/bin/kpatch"
+        val probe = Shell.cmd("test -x " + SELF_MANAGED_BIN + " && echo KPM_OK").exec()
+        if (probe.out.any { it.trim() == "KPM_OK" }) {
+            SELF_MANAGED_BIN
+        } else {
+            CANDIDATE_DIRS.map { File(it, "kpatch") }.firstOrNull { it.exists() }?.absolutePath
+                ?: "/data/adb/modules/KPatch-Next/bin/kpatch"
+        }
     }
 
     private fun quote(s: String): String {
