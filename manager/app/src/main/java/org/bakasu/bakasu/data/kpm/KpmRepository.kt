@@ -18,9 +18,16 @@ data class KpmModule(
  * 通过 KPatch-Next 的 kpatch CLI 管理 KPM 模块。
  * 该能力来自内核侧的 KPatch-Next，不依赖管理器内置的 KPM 支持。
  */
-class KpmRepository {
+class KpmRepository(private val context: android.content.Context) {
 
-    private companion object {
+    companion object {
+        /** 自理目录：不依赖 KPatch-Next 模块 */
+        const val TOOL_DIR = "/data/adb/kpm-tool"
+        const val BIN_DIR = "$TOOL_DIR/bin"
+        const val KPM_DIR = "$TOOL_DIR/kpm"
+        const val BOOT_SCRIPT = "/data/adb/service.d/99-kpm-autoload.sh"
+        const val ASSET_NAME = "kpatch-arm64"
+
         /** 自理目录：管理器自举释放的 kpatch，优先使用 */
         const val SELF_MANAGED_BIN = "/data/adb/kpm-tool/bin/kpatch"
 
@@ -44,6 +51,49 @@ class KpmRepository {
             CANDIDATE_DIRS.map { File(it, "kpatch") }.firstOrNull { it.exists() }?.absolutePath
                 ?: "/data/adb/modules/KPatch-Next/bin/kpatch"
         }
+    }
+
+    private val bootScriptBody: String = """
+#!/system/bin/sh
+# 由 BakaSU 的 KPM 页面生成：开机自动加载 /data/adb/kpm-tool/kpm/*.kpm
+[ -x /data/adb/kpm-tool/bin/kpatch ] || exit 0
+until [ "$(getprop sys.boot_completed)" = "1" ]; do sleep 1; done
+for f in /data/adb/kpm-tool/kpm/*.kpm; do
+    [ -s "$f" ] || continue
+    /data/adb/kpm-tool/bin/kpatch kpm load "$f" >> /data/adb/kpm-tool/autoload.log 2>&1
+done
+""".trimIndent()
+
+    /**
+     * 首次运行时把 APK 内置的 kpatch 释放到 /data/adb/kpm-tool/bin，
+     * 并写好开机自动加载脚本，从此不再依赖 KPatch-Next 模块。
+     */
+    suspend fun bootstrap(): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val bin = File(BIN_DIR, "kpatch")
+            // App 无法 stat /data/adb 下的 0700 目录，交给 shell 判断
+            val alreadyDeployed = Shell.cmd("test -x " + quote(bin.absolutePath)).exec().isSuccess
+            if (!alreadyDeployed) {
+                val cache = File(context.cacheDir, "kpatch")
+                context.assets.open(ASSET_NAME).use { input ->
+                    cache.outputStream().use { output -> input.copyTo(output) }
+                }
+                val cmd = Shell.cmd(
+                    "mkdir -p " + BIN_DIR + " " + KPM_DIR + " /data/adb/service.d" +
+                        " && cp " + quote(cache.absolutePath) + " " + quote(bin.absolutePath) +
+                        " && chmod 755 " + quote(bin.absolutePath),
+                ).exec()
+                if (!cmd.isSuccess) return@runCatching false
+
+                val script = File(context.cacheDir, "99-kpm-autoload.sh")
+                script.writeText(bootScriptBody)
+                Shell.cmd(
+                    "cp " + quote(script.absolutePath) + " " + quote(BOOT_SCRIPT) +
+                        " && chmod 755 " + quote(BOOT_SCRIPT),
+                ).exec()
+            }
+            true
+        }.getOrDefault(false)
     }
 
     private fun quote(s: String): String {
