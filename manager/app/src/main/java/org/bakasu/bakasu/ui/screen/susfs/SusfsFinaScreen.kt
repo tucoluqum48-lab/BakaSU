@@ -71,7 +71,9 @@ fun SusfsFinaScreen() {
     var tab by remember { mutableStateOf(0) }
     var busy by remember { mutableStateOf(false) }
 
-    fun notify(msg: String) = snackbar.showReplacingSnackbar(msg)
+    fun notify(msg: String) {
+        scope.launch { snackbar.showReplacingSnackbar(msg) }
+    }
 
     fun reload() {
         scope.launch {
@@ -383,8 +385,7 @@ private fun PathTab(
                     )
                     Spacer(Modifier.height(6.dp))
                     TextButton(onClick = {
-                        val lines = batch.split("
-").map { it.trim() }.filter { it.isNotEmpty() }
+                        val lines = batch.lines().map { it.trim() }.filter { it.isNotEmpty() }
                         if (lines.isNotEmpty()) {
                             onAddBatch(lines)
                             batch = ""
