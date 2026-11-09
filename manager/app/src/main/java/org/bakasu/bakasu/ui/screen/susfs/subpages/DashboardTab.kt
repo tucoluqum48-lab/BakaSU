@@ -27,10 +27,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
-import org.bakasu.bakasu.data.susfs.SuSFSConfig
+import org.bakasu.bakasu.domain.model.SuSFSConfig
 import org.bakasu.bakasu.ui.screen.susfs.RegisterSuSFSRefresh
 import org.bakasu.bakasu.ui.screen.susfs.SuSFSRefreshRegistrar
 import org.bakasu.bakasu.ui.util.LocalSnackbarHost
