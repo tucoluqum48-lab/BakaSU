@@ -176,7 +176,7 @@ jobs:
               req.add_header("Authorization", "Bearer " + token)
           with urllib.request.urlopen(req, timeout=30) as r:
               link = r.headers.get("Link", "")
-          m = re.search(r"[?&]page=(\d+)>; rel="last"", link)
+          m = re.search(r'[?&]page=(\d+)>; rel="last"', link)
           n = int(m.group(1)) if m else 0
           p = pathlib.Path("manager/build.gradle.kts")
           if n:
