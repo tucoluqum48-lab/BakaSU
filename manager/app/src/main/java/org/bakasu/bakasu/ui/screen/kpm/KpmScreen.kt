@@ -315,6 +315,14 @@ fun KpmScreen() {
                         onValueChange = { ctlArgs = it },
                         singleLine = true,
                         label = { Text("参数") },
+                        placeholder = {
+                            Text("add <uid> / remove <uid> / list / clear", fontSize = 12.sp)
+                        },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "参数整体作为一个字符串传给模块，可含空格，例如 add 10123",
+                        fontSize = 11.sp,
                     )
                 }
             },
