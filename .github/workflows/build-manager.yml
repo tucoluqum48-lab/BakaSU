@@ -165,9 +165,14 @@ jobs:
 
       - name: 同步 versionCode 到内核驱动版本
         run: |
-          VC=$((30000 + $(git rev-list --count HEAD) + 700))
-          sed -i "s/extra\["managerVersionCode"\] = [0-9]*/extra["managerVersionCode"] = $VC/" manager/build.gradle.kts
-          echo "managerVersionCode -> $VC"
+          python3 - <<'PY'
+          import re, pathlib, subprocess
+          n = int(subprocess.check_output(["git", "rev-list", "--count", "HEAD"]).strip())
+          vc = 30000 + n + 700
+          p = pathlib.Path("manager/build.gradle.kts")
+          p.write_text(re.sub(r'extra\["managerVersionCode"\] = \d+', f'extra["managerVersionCode"] = {vc}', p.read_text()))
+          print("managerVersionCode ->", vc)
+          PY
           grep -n managerVersionCode manager/build.gradle.kts
 
       - name: Build APK
