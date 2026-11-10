@@ -163,6 +163,13 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      - name: 同步 versionCode 到内核驱动版本
+        run: |
+          VC=$((30000 + $(git rev-list --count HEAD) + 700))
+          sed -i "s/extra\["managerVersionCode"\] = [0-9]*/extra["managerVersionCode"] = $VC/" manager/build.gradle.kts
+          echo "managerVersionCode -> $VC"
+          grep -n managerVersionCode manager/build.gradle.kts
+
       - name: Build APK
         run: |
           export BUILD_EXTRA_ARGS=""
