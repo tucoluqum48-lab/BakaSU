@@ -178,7 +178,7 @@ jobs:
               link = r.headers.get("Link", "")
           m = re.search(r'[?&]page=(\d+)>; rel="last"', link)
           n = int(m.group(1)) if m else 0
-          p = pathlib.Path("manager/build.gradle.kts")
+          p = pathlib.Path("build.gradle.kts")
           if n:
               vc = 30000 + n + 700
               p.write_text(re.sub(r'extra\["managerVersionCode"\] = \d+', f'extra["managerVersionCode"] = {vc}', p.read_text()))
@@ -186,7 +186,7 @@ jobs:
           else:
               print("!! 无法获取上游提交数，保留原 versionCode")
           PY
-          grep -n managerVersionCode manager/build.gradle.kts
+          grep -n managerVersionCode build.gradle.kts
 
       - name: Build APK
         run: |
