@@ -101,7 +101,7 @@ jobs:
           print("KSU_VERSION_OVERRIDE=%d" % vc)
           print("KSU_VERSION_NAME_OVERRIDE=4.2.0-rc3")
           PY
-          echo "upstream versionCode=${KSU_VERSION_OVERRIDE:-0}"
+          grep KSU_VERSION_OVERRIDE $GITHUB_ENV
 
       - name: Build ksud
         run: |
