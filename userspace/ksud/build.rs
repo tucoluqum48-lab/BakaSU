@@ -11,6 +11,15 @@ const BOOTSTRAP_OBJECT: &str = "lkm_image_bootstrap.o";
 const PREPARED_BOOTSTRAP_OBJECT: &str = ".lkm_image_bootstrap.o";
 
 fn get_git_version() -> Result<(u32, String), std::io::Error> {
+    if let Ok(v) = std::env::var("KSU_VERSION_OVERRIDE") {
+        if let Ok(code) = v.parse::<u32>() {
+            println!("cargo:warning=Using KSU_VERSION_OVERRIDE={}", code);
+            let name = std::env::var("KSU_VERSION_NAME_OVERRIDE")
+                .unwrap_or_else(|_| "4.2.0-rc3".to_string());
+            return Ok((code, name));
+        }
+    }
+
     let output = Command::new("git")
         .args(["rev-list", "--count", "HEAD"])
         .output()?;
