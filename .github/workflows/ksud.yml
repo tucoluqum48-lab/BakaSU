@@ -82,6 +82,27 @@ jobs:
             -o userspace/ksud/.lkm_image_bootstrap.o \
             userspace/ksud/src/lkm_image_bootstrap.S
 
+      - name: 版本号对齐上游 BakaSU 提交数
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY' >> $GITHUB_ENV
+          import os, re, urllib.request
+          token = os.environ.get("GH_TOKEN", "")
+          url = "https://api.github.com/repos/Baka-SU/BakaSU/commits?sha=main&per_page=1"
+          req = urllib.request.Request(url)
+          if token:
+              req.add_header("Authorization", "Bearer " + token)
+          with urllib.request.urlopen(req, timeout=30) as r:
+              link = r.headers.get("Link", "")
+          m = re.search(r'[?&]page=(\d+)>; rel="last"', link)
+          n = int(m.group(1)) if m else 0
+          vc = 30000 + n + 700 if n else 0
+          print("KSU_VERSION_OVERRIDE=%d" % vc)
+          print("KSU_VERSION_NAME_OVERRIDE=4.2.0-rc3")
+          PY
+          echo "upstream versionCode=${KSU_VERSION_OVERRIDE:-0}"
+
       - name: Build ksud
         run: |
           if [ "${{github.event_name}}" == "pull_request" ]; then
