@@ -215,19 +215,21 @@ done
         }
 
     suspend fun ctl0(name: String, args: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
-        // 与 KPatch-Next WebUI 一致：参数整体包双引号并转义，空参数传空串，
-        // 否则带空格的参数会被 shell 拆成多个，模块收到错误内容。
-        val argToken = if (args.isEmpty()) {
-            ""
-        } else {
-            val escaped = args
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("$", "\\$")
-            "\"" + escaped + "\""
+        // 模块要求参数整体作为一个 argv 传入（"add 10123"），裸传会被拆成两个参数，
+        // 模块只会收到 "add" 并回 ERROR: unknown command。空参数则直接拒发。
+        if (args.isEmpty()) {
+            return@withContext false to "参数不能为空，例如 add 10123 / list / clear"
         }
-        val r = Shell.cmd(binaryPath + " kpm ctl0 " + quote(name) + " " + argToken).exec()
-        val text = if (r.isSuccess) r.out else r.err
-        r.isSuccess to text.joinToString(" ").trim()
+        val escaped = args
+            .replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("$", "\\$")
+        val argToken = "\"" + escaped + "\""
+        val cmd = binaryPath + " kpm ctl0 " + quote(name) + " " + argToken
+        val r = Shell.cmd(cmd).exec()
+        val text = (if (r.out.isNotEmpty()) r.out else r.err).joinToString(" ").trim()
+        // 模块自身用 ERROR: 前缀表示失败，kpatch 的退出码不一定非零，这里一并判定
+        val ok = r.isSuccess && !text.contains("ERROR")
+        if (ok) true to text.ifEmpty { "已发送（无返回）" } else false to (text.ifEmpty { "无输出" } + " ｜命令：" + cmd)
     }
 }
