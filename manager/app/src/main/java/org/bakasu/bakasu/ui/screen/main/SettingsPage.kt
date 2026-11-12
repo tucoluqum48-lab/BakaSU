@@ -572,8 +572,11 @@ fun SettingsPage(bottomPadding: Dp) {
                                     // 直接打开内置的原版 KPM 界面（WebUI），不再进 Compose 页
                                     scope.launch {
                                         runCatching {
-                                            org.bakasu.bakasu.data.kpm.KpmRepository(context.applicationContext)
-                                                .ensureWebUiModule()
+                                            val kpmRepo =
+                                                org.bakasu.bakasu.data.kpm.KpmRepository(context.applicationContext)
+                                            // 自愈：补齐工具链（kpatch/kpimg/kptools/magiskboot）并重写开机脚本
+                                            runCatching { kpmRepo.bootstrap() }
+                                            kpmRepo.ensureWebUiModule()
                                             context.startActivity(
                                                 Intent(
                                                     context,
