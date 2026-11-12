@@ -81,7 +81,19 @@ for f in /data/adb/kpm-tool/kpm/*.kpm; do
     [ -s "${'$'}f" ] || continue
     /data/adb/kpm-tool/bin/kpatch kpm load "${'$'}f" >> /data/adb/kpm-tool/autoload.log 2>&1
 done
-# 应用级排除：内核不持久化，开机重放一遍
+# 应用级排除（内核不持久化，开机重放）
+# ① 原版 WebUI 的 package_config：包名,exclude,allow,uid
+if [ -s /data/adb/kpm-tool/package_config ]; then
+    PMDUMP="${'$'}(pm list packages -U 2>/dev/null)"
+    while IFS=, read -r pkg exclude allow uid; do
+        [ "${'$'}exclude" = "1" ] || continue
+        [ -n "${'$'}pkg" ] || continue
+        U="${'$'}(echo "${'$'}PMDUMP" | sed -n "s/^package:${'$'}pkg uid:\([0-9]*\).*/\1/p" | head -1)"
+        [ -z "${'$'}U" ] && U="${'$'}uid"
+        [ -n "${'$'}U" ] && /data/adb/kpm-tool/bin/kpatch exclude_set "${'$'}U" 1 >> /data/adb/kpm-tool/autoload.log 2>&1
+    done < /data/adb/kpm-tool/package_config
+fi
+# ② 兼容旧的纯 UID 列表
 if [ -s /data/adb/kpm-tool/exclude_apps.list ]; then
     while read -r u; do
         [ -n "${'$'}u" ] || continue
