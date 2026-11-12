@@ -47,12 +47,15 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.content.Intent
+import android.net.Uri
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import java.io.File
 import org.bakasu.bakasu.data.kpm.KpmModule
 import org.bakasu.bakasu.data.kpm.KpmRepository
 import org.bakasu.bakasu.ui.navigation.LocalNavigator
+import org.bakasu.bakasu.ui.webui.WebUIActivity
 
 /**
  * KPM 模块管理页：调用 KPatch-Next 的 kpatch CLI，
@@ -199,6 +202,29 @@ fun KpmScreen() {
                 showExclude = true
                 loadExcludeApps()
             }) { Text("排除应用") }
+            Spacer(Modifier.width(4.dp))
+            TextButton(onClick = {
+                scope.launch {
+                    loading = true
+                    val ok = repo.ensureWebUiModule()
+                    loading = false
+                    if (!ok) {
+                        message = "内置界面部署失败"
+                    } else {
+                        runCatching {
+                            context.startActivity(
+                                Intent(context, WebUIActivity::class.java).setData(
+                                    Uri.Builder()
+                                        .scheme("kernelsu")
+                                        .authority("webui")
+                                        .appendQueryParameter("id", KpmRepository.WEBUI_MODULE_ID)
+                                        .build(),
+                                ),
+                            )
+                        }.onFailure { message = "打开界面失败：" + (it.message ?: "") }
+                    }
+                }
+            }) { Text("原版界面") }
         }
 
         if (message.isNotEmpty()) {
