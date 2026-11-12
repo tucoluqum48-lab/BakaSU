@@ -41,7 +41,6 @@ class KpmRepository(private val context: android.content.Context) {
         val CANDIDATE_DIRS = listOf(
             BIN_DIR,
             "/data/adb/modules/KPatch-Next/bin",
-            "/data/adb/kp-next/bin",
             "/data/adb/kpm/bin",
         )
     }
@@ -242,29 +241,9 @@ fi
 
             org.bakasu.bakasu.ui.webui.BuiltinWebUI.register(root, "KPM 管理界面")
 
-            // 运行资产：界面里的补丁/日志等功能会用到 kp-next 下的 bin 与 patch
-            val kpDir = File(context.filesDir, "kp-next")
-            val kpStage = File(context.cacheDir, "kp-next-assets")
-            if (kpStage.exists()) kpStage.deleteRecursively()
-            copyAssetDir("kpnext", kpStage)
-            listOf("bin", "patch", "tmp", "log").forEach { sub ->
-                val target = File(kpDir, sub)
-                if (!target.exists()) target.mkdirs()
-            }
-            listOf("bin", "patch").forEach { sub ->
-                val src = File(kpStage, sub)
-                if (src.isDirectory) src.copyRecursively(File(kpDir, sub), overwrite = true)
-            }
-            kpStage.deleteRecursively()
-
             // WebUI 里调用的是裸命令 kpatch，需要它在 root shell 的 PATH 中；
-            // 同时把 bin/patch 同步到 /data/adb/kp-next（界面里用绝对路径调用）
             Shell.cmd(
-                "mkdir -p /data/adb/ksu/bin /data/adb/kp-next/bin /data/adb/kp-next/patch" +
-                    " /data/adb/kp-next/tmp /data/adb/kp-next/log" +
-                    " && cp -rf " + quote(File(kpDir, "bin").absolutePath) + "/. /data/adb/kp-next/bin/" +
-                    " && cp -rf " + quote(File(kpDir, "patch").absolutePath) + "/. /data/adb/kp-next/patch/" +
-                    " && chmod -R 755 /data/adb/kp-next/bin /data/adb/kp-next/patch" +
+                "mkdir -p /data/adb/ksu/bin " + BIN_DIR +
                     " && ln -sf " + SELF_MANAGED_BIN + " /data/adb/ksu/bin/kpatch",
             ).exec()
             webroot.isDirectory
