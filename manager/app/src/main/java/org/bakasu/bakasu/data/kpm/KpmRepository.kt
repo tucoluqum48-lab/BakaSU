@@ -33,6 +33,9 @@ class KpmRepository(private val context: android.content.Context) {
         const val ASSET_NAME = "kpatch-arm64"
         /** 随 APK 一起发布的内置工具链（重装后自动补齐） */
         val BUNDLED_BINS = listOf("kpimg", "kptools", "magiskboot")
+        /** 内置补丁脚本（补丁页需要，随 APK 发布） */
+        val BUNDLED_PATCH = listOf("boot_extract.sh", "boot_patch.sh", "boot_unpatch.sh", "util_functions.sh")
+        const val PATCH_DIR = "$TOOL_DIR/patch"
 
         /** 模块路径：仅作为自举前的兜底 */
         val FALLBACK_BIN = "/data/adb/modules/KPatch-Next/bin/kpatch"
@@ -129,6 +132,23 @@ fi
                 val cache = File(context.cacheDir, name)
                 runCatching {
                     context.assets.open("kpmbin/" + name).use { input ->
+                        cache.outputStream().use { output -> input.copyTo(output) }
+                    }
+                }.getOrElse { continue }
+                Shell.cmd(
+                    "cp " + quote(cache.absolutePath) + " " + quote(target) +
+                        " && chmod 755 " + quote(target),
+                ).exec()
+            }
+            // 补丁脚本一并补齐（补丁页会用到）
+            Shell.cmd("mkdir -p " + PATCH_DIR).exec()
+            for (name in BUNDLED_PATCH) {
+                val target = PATCH_DIR + "/" + name
+                val present = Shell.cmd("test -s " + quote(target)).exec().isSuccess
+                if (present) continue
+                val cache = File(context.cacheDir, "patch_" + name)
+                runCatching {
+                    context.assets.open("kmppatch/" + name).use { input ->
                         cache.outputStream().use { output -> input.copyTo(output) }
                     }
                 }.getOrElse { continue }
