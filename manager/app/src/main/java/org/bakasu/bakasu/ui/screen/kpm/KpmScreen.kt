@@ -217,7 +217,7 @@ fun KpmScreen() {
                                     Uri.Builder()
                                         .scheme("kernelsu")
                                         .authority("webui")
-                                        .appendQueryParameter("id", KpmRepository.WEBUI_MODULE_ID)
+                                        .appendQueryParameter("id", org.bakasu.bakasu.ui.webui.BuiltinWebUI.MODULE_ID)
                                         .build(),
                                 ),
                             )
