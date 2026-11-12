@@ -1,9 +1,9 @@
 package org.bakasu.bakasu.data.kpm
 
 import com.topjohnwu.superuser.Shell
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
 
 data class KpmModule(
     val name: String,
@@ -26,14 +26,18 @@ class KpmRepository(private val context: android.content.Context) {
         const val BIN_DIR = "$TOOL_DIR/bin"
         const val KPM_DIR = "$TOOL_DIR/kpm"
         const val BOOT_SCRIPT = "/data/adb/service.d/99-kpm-autoload.sh"
+
         /** 内置 WebUI 放在 app 私有目录，不落 /data/adb/modules */
         const val WEBUI_DIR = "kpmwebui"
         const val ASSET_NAME = "kpatch-arm64"
+
         /** 随 APK 一起发布的内置工具链（重装后自动补齐） */
         val BUNDLED_BINS = listOf("kpimg", "kptools", "magiskboot")
+
         /** 内置补丁脚本（补丁页需要，随 APK 发布） */
         val BUNDLED_PATCH = listOf("boot_extract.sh", "boot_patch.sh", "boot_unpatch.sh", "util_functions.sh")
         const val PATCH_DIR = "$TOOL_DIR/patch"
+
         /** 内置开机脚本：缺失时自动释放 */
         val BUNDLED_SCRIPTS = listOf(
             "99-uidhide.sh" to "/data/adb/boot-completed.d/99-uidhide.sh",
@@ -114,7 +118,7 @@ done
 
 # 4. 记录一次运行状态（等价原版 status.sh 的职责）
 [ -x "${'$'}TOOL/status.sh" ] && sh "${'$'}TOOL/status.sh" >/dev/null 2>&1
-""".trimIndent()
+    """.trimIndent()
 
     /**
      * 首次运行时把 kpatch 释放到 /data/adb/kpm-tool/bin，
@@ -247,8 +251,7 @@ done
 
     suspend fun count(): Int = exec("kpm", "num").firstOrNull()?.trim()?.toIntOrNull() ?: 0
 
-    suspend fun listNames(): List<String> =
-        exec("kpm", "list").map { it.trim() }.filter { it.isNotEmpty() }
+    suspend fun listNames(): List<String> = exec("kpm", "list").map { it.trim() }.filter { it.isNotEmpty() }
 
     suspend fun info(name: String): KpmModule? {
         val lines = exec("kpm", "info", name)
@@ -336,26 +339,25 @@ done
      * 开机自动加载：把 .kpm 复制进自启目录并立刻加载一次。
      * 下次开机由 KPatch-Next 的 service.sh 自动加载。
      */
-    suspend fun installPersistent(srcPath: String, fileName: String): Pair<Boolean, String> =
-        withContext(Dispatchers.IO) {
-            val safeName = if (fileName.endsWith(".kpm")) fileName else fileName + ".kpm"
-            // 同名文件已存在时追加序号，避免覆盖已有模块
-            var target = safeName
-            var index = 1
-            while (Shell.cmd("test -e " + quote(persistentDir + "/" + target)).exec().isSuccess && index < 100) {
-                target = safeName.removeSuffix(".kpm") + "_" + index + ".kpm"
-                index++
-            }
-            val dest = persistentDir + "/" + target
-            val copy = Shell.cmd(
-                "mkdir -p " + persistentDir +
-                    " && cp " + quote(srcPath) + " " + quote(dest) +
-                    " && chmod 644 " + quote(dest),
-            ).exec()
-            if (!copy.isSuccess) return@withContext false to copy.err.joinToString(" ").trim()
-            val load = Shell.cmd(binaryPath + " kpm load " + quote(dest)).exec()
-            load.isSuccess to (if (load.isSuccess) dest else (load.out + load.err).joinToString(" ").trim())
+    suspend fun installPersistent(srcPath: String, fileName: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        val safeName = if (fileName.endsWith(".kpm")) fileName else fileName + ".kpm"
+        // 同名文件已存在时追加序号，避免覆盖已有模块
+        var target = safeName
+        var index = 1
+        while (Shell.cmd("test -e " + quote(persistentDir + "/" + target)).exec().isSuccess && index < 100) {
+            target = safeName.removeSuffix(".kpm") + "_" + index + ".kpm"
+            index++
         }
+        val dest = persistentDir + "/" + target
+        val copy = Shell.cmd(
+            "mkdir -p " + persistentDir +
+                " && cp " + quote(srcPath) + " " + quote(dest) +
+                " && chmod 644 " + quote(dest),
+        ).exec()
+        if (!copy.isSuccess) return@withContext false to copy.err.joinToString(" ").trim()
+        val load = Shell.cmd(binaryPath + " kpm load " + quote(dest)).exec()
+        load.isSuccess to (if (load.isSuccess) dest else (load.out + load.err).joinToString(" ").trim())
+    }
 
     suspend fun removePersistent(name: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
         val dest = persistentDir + "/" + name
@@ -368,23 +370,22 @@ done
         r.isSuccess to (r.out + r.err).joinToString(" ").trim()
     }
 
-    suspend fun load(path: String, extraArgs: String = ""): Pair<Boolean, String> =
-        withContext(Dispatchers.IO) {
-            fun attempt(p: String) = buildString {
-                append(binaryPath).append(" kpm load ").append(quote(p))
-                if (extraArgs.isNotBlank()) append(' ').append(extraArgs)
-            }
-            var r = Shell.cmd(attempt(path)).exec()
-            if (!r.isSuccess) {
-                // App 私有目录可能被 SELinux 挡住，复制到 /data/local/tmp 再试一次
-                val tmp = "/data/local/tmp/kpm_import.kpm"
-                val copied = Shell.cmd(
-                    "cp " + quote(path) + " " + tmp + " && chmod 644 " + tmp
-                ).exec()
-                if (copied.isSuccess) r = Shell.cmd(attempt(tmp)).exec()
-            }
-            r.isSuccess to (r.out + r.err).joinToString(" ").trim()
+    suspend fun load(path: String, extraArgs: String = ""): Pair<Boolean, String> = withContext(Dispatchers.IO) {
+        fun attempt(p: String) = buildString {
+            append(binaryPath).append(" kpm load ").append(quote(p))
+            if (extraArgs.isNotBlank()) append(' ').append(extraArgs)
         }
+        var r = Shell.cmd(attempt(path)).exec()
+        if (!r.isSuccess) {
+            // App 私有目录可能被 SELinux 挡住，复制到 /data/local/tmp 再试一次
+            val tmp = "/data/local/tmp/kpm_import.kpm"
+            val copied = Shell.cmd(
+                "cp " + quote(path) + " " + tmp + " && chmod 644 " + tmp,
+            ).exec()
+            if (copied.isSuccess) r = Shell.cmd(attempt(tmp)).exec()
+        }
+        r.isSuccess to (r.out + r.err).joinToString(" ").trim()
+    }
 
     suspend fun ctl0(name: String, args: String): Pair<Boolean, String> = withContext(Dispatchers.IO) {
         // 模块要求参数整体作为一个 argv 传入（"add 10123"），裸传会被拆成两个参数，
