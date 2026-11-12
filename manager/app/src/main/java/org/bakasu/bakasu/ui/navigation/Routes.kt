@@ -32,10 +32,6 @@ sealed interface Route :
 
     @Parcelize
     @Serializable
-    data object Kpm : Route
-
-    @Parcelize
-    @Serializable
     data object Home : Route
 
     @Parcelize
