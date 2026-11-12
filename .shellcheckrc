@@ -1,0 +1,3 @@
+# 第三方脚本（KPatch-Next 等）沿用其自身风格，不做严格检查
+exclude=SC2034,SC2045,SC2068,SC1090,SC1091,SC2086,SC2155,SC2164,SC2016
+severity=error
