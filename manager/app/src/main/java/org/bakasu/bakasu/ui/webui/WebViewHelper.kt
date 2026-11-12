@@ -82,10 +82,10 @@ internal suspend fun prepareWebView(
 
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
                 @Suppress("DEPRECATION")
-                activity.setTaskDescription(ActivityManager.TaskDescription("KernelSU - ${moduleInfo.name}"))
+                activity.setTaskDescription(ActivityManager.TaskDescription("BakaSU - ${moduleInfo.name}"))
             } else {
                 val taskDescription = ActivityManager.TaskDescription.Builder()
-                    .setLabel("KernelSU - ${moduleInfo.name}")
+                    .setLabel("BakaSU - ${moduleInfo.name}")
                     .build()
                 activity.setTaskDescription(taskDescription)
             }
