@@ -1,6 +1,6 @@
 #!/system/bin/sh
 # UidHide KPM：开机后从 HMA-OSS 黑名单自动同步并下发控制参数
-# 由 dsh 生成，2026-11-11  v2（自动同步版）
+# 由 dsh 生成，2026-11-12  v3（仅从 HMA 黑名单同步，无回退列表）
 KP=/data/adb/kpm-tool/bin/kpatch
 LOG=/data/adb/kpm-tool/uidhide.log
 HMA=/data/misc/hide_my_applist_mjmfawssrhwqnrnf/config.json
@@ -25,10 +25,10 @@ if [ -r "$HMA" ]; then
         | tr ',' ' ' | tr -d '"' | tr -s ' ')
 fi
 
-# 2b. 读不到或解析失败时回退固定列表
+# 2b. 读不到或解析失败 → 直接退出，不改动现有排除列表
 if [ -z "$PKGS" ]; then
-    echo "HMA 配置解析失败，回退固定列表" >> "$LOG"
-    PKGS="bin.mt.plus.canary com.suqi8.oshin xyz.melodylsp.codec org.frknkrc44.hma_oss com.omarea.vtools com.github.android org.telegram.messenger cn.myflv.noactive app.mango.im moe.shizuku.privileged.api com.github.capntrips.kernelflasher com.byyoung.setting com.dshpet.android dsh.android.client com.v2ray.ang com.resukisu.resukisu"
+    echo "HMA 配置不可用或黑名单为空，跳过本次同步" >> "$LOG"
+    exit 0
 fi
 
 # 3. 包名 -> UID
@@ -51,5 +51,7 @@ done
 
 echo "--- result ---" >> "$LOG"
 "$KP" kpm ctl0 UidHide "list" >> "$LOG" 2>&1
+
+[EXIT=0]
 
 [EXIT=0]
