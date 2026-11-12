@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- UI Labels -->
+    <string name="title_patch">Patcher</string>
+    <string name="title_unpatch">Dépatcher</string>
+    <string name="title_kpmodule">Module KPM</string>
+    <string name="title_exclude">Exclure</string>
+    <string name="title_settings">Paramètres</string>
+    <string name="title_home">Accueil</string>
+    <string name="title_language">Langue</string>
+    <string name="title_control_kpmodule">Contrôler le module KPM</string>
+    <string name="title_select_language">Sélectionner la langue</string>
+    <string name="title_reboot">Redémarrer</string>
+    <string name="title_reboot_recovery">Redémarrer en mode Récupération</string>
+    <string name="title_reboot_bootloader">Redémarrer vers le Bootloader</string>
+    <string name="title_reboot_download">Redémarrer en mode Téléchargement</string>
+    <string name="title_reboot_edl">Redémarrer en mode EDL</string>
+    <string name="title_rehook_syscall">Rehook Syscall</string>
+    <!-- Buttons -->
+    <string name="button_install">Appuyez pour installer</string>
+    <string name="button_uninstall">Désinstaller</string>
+    <string name="button_embed_kpm">Intégrer un module KPM</string>
+    <string name="button_start">Démarrer</string>
+    <string name="button_unpatch">Dépatcher</string>
+    <string name="button_cancel">Annuler</string>
+    <string name="button_load">Charger</string>
+    <string name="button_unload">Décharger</string>
+    <string name="button_refresh">Recharger</string>
+    <!-- Labels -->
+    <string name="label_input_control_parameters">Entrez les commandes de réglage:</string>
+    <string name="label_parameters">Réglages</string>
+    <string name="label_load_temporarily">Charger temporairement</string>
+    <string name="label_show_system_app">Afficher les applications système</string>
+    <string name="label_system_default">Paramètre système par défaut</string>
+    <string name="label_trigger_event">Déclencher un événement</string>
+    <!-- Status -->
+    <string name="status_not_installed">Non installé</string>
+    <string name="status_working">En fonctionnement 😋</string>
+    <string name="status_loading">Chargement...</string>
+    <!-- Info -->
+    <string name="info_kernel_version">Version du kernel</string>
+    <string name="info_system_version">Version du système</string>
+    <string name="info_fingerprint">Empreinte</string>
+    <string name="info_selinux_status">État de SELinux</string>
+    <string name="info_version">Version: %1$s</string>
+    <string name="info_time">Date: %1$s</string>
+    <string name="info_config">Configuration: %1$s</string>
+    <string name="info_slot">Emplacement: %1$s</string>
+    <string name="info_device">Appareil: %1$s</string>
+    <string name="info_device_unknown">Appareil: Inconnu</string>
+    <string name="info_author">Auteur: %1$s</string>
+    <string name="info_args">Arguments: %1$s</string>
+    <string name="info_no_description">Aucune description</string>
+    <string name="info_embedded">INTÉGRÉ</string>
+    <string name="info_user">UTILISATEUR %1$s</string>
+    <string name="info_system">SYSTÈME</string>
+    <!-- Messages -->
+    <string name="msg_no_module_loaded">Aucun module chargé</string>
+    <string name="msg_no_app_found">Aucune application trouvée</string>
+    <string name="msg_no_module_found">Aucun module trouvé</string>
+    <string name="msg_module_loaded">%1$s va être chargé.</string>
+    <string name="msg_unload_module">Décharger le module %1$s?</string>
+    <string name="msg_redirecting_to">Redirection vers %1$s</string>
+    <string name="msg_failed_open_link">Echec de l'ouverture du lien avec l'éxecutable</string>
+    <string name="msg_failed_parse_kernel">Echec de l'analyse du kernel:</string>
+    <string name="msg_boot_extract_failed">L'extraction de l'image boot a échouée</string>
+    <string name="msg_failed_locate_boot">La localisation de l'image boot a échouée</string>
+    <string name="msg_invalid_kpm_file">Fichier KPM incorrect</string>
+    <string name="msg_could_not_parse_kpm">Analyse des infos du KPM impossible</string>
+    <string name="msg_error_no_boot_image">Erreur: Aucune image boot trouvée.</string>
+    <string name="msg_please_select_file">Sélectionnez un fichier %1$s s'il vous plaît</string>
+    <string name="msg_please_wait">Veuillez patienter...</string>
+    <string name="msg_uploading">Envoi en cours... </string>
+    <string name="msg_upload_cancelled">Envoi annulé</string>
+    <string name="msg_error">Erreur: %1$s</string>
+    <string name="msg_successfully_loaded">%1$s a été chargé avec succès</string>
+    <string name="msg_failed_load_module">%1$s n'a pu être chargé</string>
+    <string name="msg_failed_get_module_info">Récupération des infos du module échouée</string>
+    <string name="msg_error_loading_apps">Erreur du chargement des applis: </string>
+    <string name="msg_error_rendering_apps">Erreur d'affichage des applis: </string>
+    <string name="msg_unknown">Inconnu</string>
+</resources>
