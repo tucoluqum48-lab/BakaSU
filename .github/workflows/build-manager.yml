@@ -332,9 +332,12 @@ jobs:
             --strip
 
       - name: Delete gradle build
+        # artifact 可能已被清理或本就不存在，删除失败不应中断打包
+        continue-on-error: true
         uses: GeekyEggo/delete-artifact@v6
         with:
           name: Manager-gradle-${{ matrix.build_type }}
+          failOnError: false
         
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
