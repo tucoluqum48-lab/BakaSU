@@ -569,7 +569,28 @@ fun SettingsPage(bottomPadding: Dp) {
                                 icon = Icons.TwoTone.Extension,
                                 title = "KPM 模块管理",
                                 onClick = {
-                                    navigator.push(Route.Kpm)
+                                    // 直接打开内置的原版 KPM 界面（WebUI），不再进 Compose 页
+                                    scope.launch {
+                                        runCatching {
+                                            org.bakasu.bakasu.data.kpm.KpmRepository(context.applicationContext)
+                                                .ensureWebUiModule()
+                                            context.startActivity(
+                                                Intent(
+                                                    context,
+                                                    org.bakasu.bakasu.ui.webui.WebUIActivity::class.java,
+                                                ).setData(
+                                                    Uri.Builder()
+                                                        .scheme("kernelsu")
+                                                        .authority("webui")
+                                                        .appendQueryParameter(
+                                                            "id",
+                                                            org.bakasu.bakasu.ui.webui.BuiltinWebUI.MODULE_ID,
+                                                        )
+                                                        .build(),
+                                                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                            )
+                                        }
+                                    }
                                 },
                             )
                         }
