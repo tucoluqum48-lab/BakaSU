@@ -38,6 +38,8 @@ class KpmRepository(private val context: android.content.Context) {
         val BUNDLED_SCRIPTS = listOf(
             "99-uidhide.sh" to "/data/adb/boot-completed.d/99-uidhide.sh",
             "97-color-saturation.sh" to "/data/adb/service.d/97-color-saturation.sh",
+            // WebUI 的 rehook 开关会调用 sh /data/adb/kpm-tool/status.sh
+            "status.sh" to "/data/adb/kpm-tool/status.sh",
         )
 
         /** 模块路径：仅作为自举前的兜底 */
@@ -109,6 +111,9 @@ tail -n +2 "${'$'}CONFIG" | while IFS=, read -r pkg exclude allow uid; do
     [ -z "${'$'}U" ] && U="${'$'}(grep "^${'$'}pkg " /data/system/packages.list 2>/dev/null | cut -d' ' -f2)"
     [ -n "${'$'}U" ] && "${'$'}KP" exclude_set "${'$'}U" 1 >> "${'$'}LOG" 2>&1
 done
+
+# 4. 记录一次运行状态（等价原版 status.sh 的职责）
+[ -x "${'$'}TOOL/status.sh" ] && sh "${'$'}TOOL/status.sh" >/dev/null 2>&1
 """.trimIndent()
 
     /**
