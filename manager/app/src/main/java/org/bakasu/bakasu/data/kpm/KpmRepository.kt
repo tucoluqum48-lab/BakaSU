@@ -73,23 +73,42 @@ class KpmRepository(private val context: android.content.Context) {
     private val bootScriptBody: String = """
 #!/system/bin/sh
 # 由 BakaSU 的 KPM 页面生成：开机自动加载 /data/adb/kpm-tool/kpm/*.kpm
-[ -x /data/adb/kpm-tool/bin/kpatch ] || exit 0
-until [ "${'$'}(getprop sys.boot_completed)" = "1" ]; do sleep 1; done
-for f in /data/adb/kpm-tool/kpm/*.kpm; do
-    [ -s "${'$'}f" ] || continue
-    /data/adb/kpm-tool/bin/kpatch kpm load "${'$'}f" >> /data/adb/kpm-tool/autoload.log 2>&1
+# 逻辑对齐原版 KPatch-Next service.sh
+TOOL=/data/adb/kpm-tool
+KP=/data/adb/kpm-tool/bin/kpatch
+CONFIG=/data/adb/kpm-tool/package_config
+REHOOKFILE=/data/adb/kpm-tool/rehook
+LOG=/data/adb/kpm-tool/autoload.log
+
+[ -x "${'$'}KP" ] || exit 0
+[ -n "${'$'}("${'$'}KP" hello 2>/dev/null)" ] || exit 0
+
+# 1. 先加载模块（不等 boot_completed，尽早注入）；损坏的 .kpm 直接删除
+for kpm in ${'$'}TOOL/kpm/*.kpm; do
+    [ -s "${'$'}kpm" ] || continue
+    "${'$'}KP" kpm load "${'$'}kpm" >> "${'$'}LOG" 2>&1 || rm -f "${'$'}kpm"
 done
-# 应用级排除：内核不持久化，开机按 package_config 重放（包名,exclude,allow,uid）
-if [ -s /data/adb/kpm-tool/package_config ]; then
-    PMDUMP="${'$'}(pm list packages -U 2>/dev/null)"
-    while IFS=, read -r pkg exclude allow uid; do
-        [ "${'$'}exclude" = "1" ] || continue
-        [ -n "${'$'}pkg" ] || continue
-        U="${'$'}(echo "${'$'}PMDUMP" | sed -n "s/^package:${'$'}pkg uid:\([0-9]*\).*/\1/p" | head -1)"
-        [ -z "${'$'}U" ] && U="${'$'}uid"
-        [ -n "${'$'}U" ] && /data/adb/kpm-tool/bin/kpatch exclude_set "${'$'}U" 1 >> /data/adb/kpm-tool/autoload.log 2>&1
-    done < /data/adb/kpm-tool/package_config
+
+# 2. rehook 重放（enable/disable 或 0/1/2）
+REHOOK="${'$'}(cat ${'$'}REHOOKFILE 2>/dev/null)"
+if [ -n "${'$'}REHOOK" ]; then
+    case "${'$'}REHOOK" in
+        enable|disable|0|1|2) "${'$'}KP" rehook "${'$'}REHOOK" >> "${'$'}LOG" 2>&1 ;;
+        *) rm -f "${'$'}REHOOKFILE" ;;
+    esac
 fi
+
+until [ "${'$'}(getprop sys.boot_completed)" = "1" ]; do sleep 1; done
+
+[ -f "${'$'}CONFIG" ] || exit 0
+
+# 3. 应用级排除重放：跳过表头，优先 pkg+uid 精确匹配，再退化 pkg
+tail -n +2 "${'$'}CONFIG" | while IFS=, read -r pkg exclude allow uid; do
+    [ "${'$'}exclude" = "1" ] || continue
+    U="${'$'}(grep "^${'$'}pkg ${'$'}uid" /data/system/packages.list 2>/dev/null | cut -d' ' -f2)"
+    [ -z "${'$'}U" ] && U="${'$'}(grep "^${'$'}pkg " /data/system/packages.list 2>/dev/null | cut -d' ' -f2)"
+    [ -n "${'$'}U" ] && "${'$'}KP" exclude_set "${'$'}U" 1 >> "${'$'}LOG" 2>&1
+done
 """.trimIndent()
 
     /**
