@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -73,6 +74,7 @@ fun KpmScreen() {
     var ctlTarget by remember { mutableStateOf<KpmModule?>(null) }
     var pendingFile by remember { mutableStateOf<File?>(null) }
     var persistentFiles by remember { mutableStateOf<List<String>>(emptyList()) }
+    var excluded by remember { mutableStateOf<Set<String>>(emptySet()) }
     var ctlArgs by remember { mutableStateOf("") }
 
     fun refresh() {
@@ -87,6 +89,7 @@ fun KpmScreen() {
                 modules = repo.listNames().mapNotNull { repo.info(it) }
             }
             persistentFiles = repo.persistentList()
+            excluded = repo.excludeList()
             loading = false
         }
     }
@@ -199,7 +202,7 @@ fun KpmScreen() {
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        "来自 " + repo.persistentDir,
+                        "来自 " + repo.persistentDir + " · 勾选「排除」则开机不加载（文件保留）",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -209,6 +212,17 @@ fun KpmScreen() {
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(name, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                            Text("排除", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Checkbox(
+                                checked = excluded.contains(name),
+                                onCheckedChange = { checked ->
+                                    scope.launch {
+                                        val r = repo.setExcluded(name, checked)
+                                        message = if (r.first) r.second else "设置失败：" + r.second
+                                        refresh()
+                                    }
+                                },
+                            )
                             TextButton(onClick = {
                                 scope.launch {
                                     val r = repo.removePersistent(name)
