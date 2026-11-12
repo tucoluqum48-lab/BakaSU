@@ -36,6 +36,11 @@ class KpmRepository(private val context: android.content.Context) {
         /** 内置补丁脚本（补丁页需要，随 APK 发布） */
         val BUNDLED_PATCH = listOf("boot_extract.sh", "boot_patch.sh", "boot_unpatch.sh", "util_functions.sh")
         const val PATCH_DIR = "$TOOL_DIR/patch"
+        /** 内置开机脚本：缺失时自动释放 */
+        val BUNDLED_SCRIPTS = listOf(
+            "99-uidhide.sh" to "/data/adb/boot-completed.d/99-uidhide.sh",
+            "97-color-saturation.sh" to "/data/adb/service.d/97-color-saturation.sh",
+        )
 
         /** 模块路径：仅作为自举前的兜底 */
         val FALLBACK_BIN = "/data/adb/modules/KPatch-Next/bin/kpatch"
@@ -116,8 +121,34 @@ fi
             // 其余内置工具链：缺哪个补哪个（重装/清数据后自动恢复）
             deployBundledBins()
 
+            // 内置的其它开机脚本（UidHide 同步、饱和度）缺失时补回
+            deployBundledScripts()
+
             // 始终按最新模板重写一次，保证开机重放排除列表的逻辑存在
             writeBootScript()
+        }.getOrDefault(false)
+    }
+
+    /** 把 assets/kpmscripts 下的开机脚本补齐（已存在则跳过，避免覆盖用户改动） */
+    private suspend fun deployBundledScripts(): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            for ((assetName, dest) in BUNDLED_SCRIPTS) {
+                val present = Shell.cmd("test -s " + quote(dest)).exec().isSuccess
+                if (present) continue
+                val cache = File(context.cacheDir, "boot_" + assetName)
+                runCatching {
+                    context.assets.open("kpmscripts/" + assetName).use { input ->
+                        cache.outputStream().use { output -> input.copyTo(output) }
+                    }
+                }.getOrElse { continue }
+                val dir = dest.substringBeforeLast('/')
+                Shell.cmd(
+                    "mkdir -p " + dir +
+                        " && cp " + quote(cache.absolutePath) + " " + quote(dest) +
+                        " && chmod 755 " + quote(dest),
+                ).exec()
+            }
+            true
         }.getOrDefault(false)
     }
 
