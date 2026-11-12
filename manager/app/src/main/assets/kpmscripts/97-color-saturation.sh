@@ -12,5 +12,3 @@ setprop persist.sys.sf.color_saturation 1.28
 service call SurfaceFlinger 1022 f 1.28 >/dev/null 2>&1
 
 echo "$(date) set saturation -> $(getprop persist.sys.sf.color_saturation)" >> "$LOG"
-
-[EXIT=0]
