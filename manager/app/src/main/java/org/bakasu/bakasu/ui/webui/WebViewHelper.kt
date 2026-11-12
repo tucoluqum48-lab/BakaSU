@@ -47,16 +47,18 @@ internal suspend fun prepareWebView(
         val builtinRoot = BuiltinWebUI.rootFor(moduleId)
         val moduleInfo = if (builtinRoot != null) {
             BuiltinWebUI.info()
-        } else try {
-            webUiRepository.getModuleInfo(moduleId)
-        } catch (error: Exception) {
-            if (error is CancellationException) throw error
-            withContext(Dispatchers.Main) {
-                webUIState.uiEvent = WebUIEvent.Error(
-                    activity.getString(R.string.module_unavailable, moduleId),
-                )
+        } else {
+            try {
+                webUiRepository.getModuleInfo(moduleId)
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                withContext(Dispatchers.Main) {
+                    webUIState.uiEvent = WebUIEvent.Error(
+                        activity.getString(R.string.module_unavailable, moduleId),
+                    )
+                }
+                return@withContext
             }
-            return@withContext
         }
 
         if (moduleInfo == null) {
