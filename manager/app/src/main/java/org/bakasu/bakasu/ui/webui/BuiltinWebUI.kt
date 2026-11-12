@@ -27,8 +27,7 @@ object BuiltinWebUI {
     }
 
     /** 若 id 命中内置界面，返回其根目录 */
-    fun rootFor(moduleId: String): File? =
-        if (moduleId == MODULE_ID) rootDir?.takeIf { it.isDirectory } else null
+    fun rootFor(moduleId: String): File? = if (moduleId == MODULE_ID) rootDir?.takeIf { it.isDirectory } else null
 
     /** 内置界面的伪模块信息 */
     fun info(): WebUiModuleInfo = WebUiModuleInfo(
