@@ -26,8 +26,6 @@ class KpmRepository(private val context: android.content.Context) {
         const val BIN_DIR = "$TOOL_DIR/bin"
         const val KPM_DIR = "$TOOL_DIR/kpm"
         const val BOOT_SCRIPT = "/data/adb/service.d/99-kpm-autoload.sh"
-        /** 应用级排除列表：每行一个 UID（内核侧不持久化，开机由脚本重放） */
-        const val EXCLUDE_APPS = "$TOOL_DIR/exclude_apps.list"
         /** 内置 WebUI 放在 app 私有目录，不落 /data/adb/modules */
         const val WEBUI_DIR = "kpmwebui"
         const val ASSET_NAME = "kpatch-arm64"
@@ -81,8 +79,7 @@ for f in /data/adb/kpm-tool/kpm/*.kpm; do
     [ -s "${'$'}f" ] || continue
     /data/adb/kpm-tool/bin/kpatch kpm load "${'$'}f" >> /data/adb/kpm-tool/autoload.log 2>&1
 done
-# 应用级排除（内核不持久化，开机重放）
-# ① 原版 WebUI 的 package_config：包名,exclude,allow,uid
+# 应用级排除：内核不持久化，开机按 package_config 重放（包名,exclude,allow,uid）
 if [ -s /data/adb/kpm-tool/package_config ]; then
     PMDUMP="${'$'}(pm list packages -U 2>/dev/null)"
     while IFS=, read -r pkg exclude allow uid; do
@@ -92,13 +89,6 @@ if [ -s /data/adb/kpm-tool/package_config ]; then
         [ -z "${'$'}U" ] && U="${'$'}uid"
         [ -n "${'$'}U" ] && /data/adb/kpm-tool/bin/kpatch exclude_set "${'$'}U" 1 >> /data/adb/kpm-tool/autoload.log 2>&1
     done < /data/adb/kpm-tool/package_config
-fi
-# ② 兼容旧的纯 UID 列表
-if [ -s /data/adb/kpm-tool/exclude_apps.list ]; then
-    while read -r u; do
-        [ -n "${'$'}u" ] || continue
-        /data/adb/kpm-tool/bin/kpatch exclude_set "${'$'}u" 1 >> /data/adb/kpm-tool/autoload.log 2>&1
-    done < /data/adb/kpm-tool/exclude_apps.list
 fi
 """.trimIndent()
 
@@ -260,85 +250,6 @@ fi
     suspend fun persistentList(): List<String> = withContext(Dispatchers.IO) {
         val r = Shell.cmd("ls -1 " + persistentDir + " 2>/dev/null").exec()
         r.out.map { it.trim() }.filter { it.endsWith(".kpm") }
-    }
-
-    /** 已排除的 UID 集合（来自本机配置文件） */
-    suspend fun excludedUids(): Set<Int> = withContext(Dispatchers.IO) {
-        val r = Shell.cmd("cat " + EXCLUDE_APPS + " 2>/dev/null").exec()
-        r.out.mapNotNull { it.trim().toIntOrNull() }.toSet()
-    }
-
-    /**
-     * 设置某个 UID 的排除状态：
-     * 1) 立即下发 exclude_set 到内核；
-     * 2) 同步写配置文件，供开机脚本重放（内核侧不持久化）。
-     */
-    suspend fun setAppExcluded(uid: Int, excluded: Boolean): Pair<Boolean, String> =
-        withContext(Dispatchers.IO) {
-            val flag = if (excluded) "1" else "0"
-            val apply = Shell.cmd(binaryPath + " exclude_set " + uid + " " + flag).exec()
-            val text = (if (apply.out.isNotEmpty()) apply.out else apply.err).joinToString(" ").trim()
-            if (!apply.isSuccess) return@withContext false to (text.ifEmpty { "exclude_set 执行失败" })
-
-            val write = buildString {
-                append("mkdir -p ").append(TOOL_DIR).append(" && touch ").append(EXCLUDE_APPS).append(" && { ")
-                if (excluded) {
-                    append("grep -qxF ").append(uid.toString()).append(" ").append(EXCLUDE_APPS)
-                    append(" || echo ").append(uid.toString()).append(" >> ").append(EXCLUDE_APPS)
-                } else {
-                    append("grep -vxF ").append(uid.toString()).append(" ").append(EXCLUDE_APPS)
-                    append(" > ").append(EXCLUDE_APPS).append(".tmp; ")
-                    append("mv ").append(EXCLUDE_APPS).append(".tmp ").append(EXCLUDE_APPS)
-                }
-                append("; }")
-            }
-            val saved = Shell.cmd(write).exec()
-            val note = (if (saved.out.isNotEmpty()) saved.out else saved.err).joinToString(" ").trim()
-            if (!saved.isSuccess) return@withContext true to (text + " ｜但写配置失败：" + note)
-            true to (if (excluded) "已排除 UID " else "已取消排除 UID ") + uid
-        }
-
-    /** 递归把 assets 目录写到本地 File */
-    private fun copyAssetDir(assetPath: String, dest: File) {
-        val am = context.assets
-        val children = am.list(assetPath).orEmpty()
-        if (children.isEmpty()) {
-            dest.parentFile?.mkdirs()
-            am.open(assetPath).use { input -> dest.outputStream().use { input.copyTo(it) } }
-            return
-        }
-        dest.mkdirs()
-        for (name in children) copyAssetDir("$assetPath/$name", File(dest, name))
-    }
-
-    /**
-     * 部署内置 KPM 管理界面（原版 WebUI）到 app 私有目录：
-     * - 释放 assets/kpmwebui → filesDir/kpmwebui/webroot
-     * - 登记到 BuiltinWebUI，WebViewHelper 会直接加载它（不创建任何模块目录）
-     * - 把 kpatch 软链到 /data/adb/ksu/bin，保证界面里 `kpatch ...` 走 PATH
-     */
-    suspend fun ensureWebUiModule(): Boolean = withContext(Dispatchers.IO) {
-        runCatching {
-            val root = File(context.filesDir, WEBUI_DIR)
-            val stage = File(context.cacheDir, "kpmwebui-assets")
-            if (stage.exists()) stage.deleteRecursively()
-            copyAssetDir("kpmwebui", stage)
-
-            val webroot = File(root, "webroot")
-            if (webroot.exists()) webroot.deleteRecursively()
-            webroot.mkdirs()
-            stage.copyRecursively(webroot, overwrite = true)
-            stage.deleteRecursively()
-
-            org.bakasu.bakasu.ui.webui.BuiltinWebUI.register(root, "KPM")
-
-            // WebUI 里调用的是裸命令 kpatch，需要它在 root shell 的 PATH 中；
-            Shell.cmd(
-                "mkdir -p /data/adb/ksu/bin " + BIN_DIR +
-                    " && ln -sf " + SELF_MANAGED_BIN + " /data/adb/ksu/bin/kpatch",
-            ).exec()
-            webroot.isDirectory
-        }.getOrDefault(false)
     }
 
     /** 始终按最新模板重写开机脚本（幂等） */
