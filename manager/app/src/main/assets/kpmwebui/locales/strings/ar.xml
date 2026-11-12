@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- UI Labels -->
+    <string name="title_patch">باتش</string>
+    <string name="title_unpatch">إلغاء الباتش</string>
+    <string name="title_kpmodule">KPModule</string>
+    <string name="title_exclude">استثناء</string>
+    <string name="title_settings">الإعدادات</string>
+    <string name="title_home">الرئيسية</string>
+    <string name="title_language">اللغة</string>
+    <string name="title_control_kpmodule">التحكم ب KPModule</string>
+    <string name="title_select_language">اختر اللغة</string>
+    <string name="title_reboot">إعادة التشغيل</string>
+    <string name="title_reboot_recovery">إعادة التشغيل لوضع الريكفري</string>
+    <string name="title_reboot_bootloader">إعادة التشغيل لوضع Bootloader</string>
+    <string name="title_reboot_download">إعادة التشغيل لوضع التحميل</string>
+    <string name="title_reboot_edl">إعادة التشغيل لوضع EDL</string>
+    <string name="title_kernel">النواة</string>
+    <!-- Buttons -->
+    <string name="button_install">انقر للتثبيت</string>
+    <string name="button_uninstall">إلغاء التثبيت</string>
+    <string name="button_embed_kpm">تضمين KPM</string>
+    <string name="button_start">ابدأ</string>
+    <string name="button_unpatch">إلغاء الباتش</string>
+    <string name="button_cancel">إلغاء</string>
+    <string name="button_ok">موافق</string>
+    <string name="button_load">تحميل</string>
+    <string name="button_unload">إلغاء التحميل</string>
+    <string name="button_refresh">إعادة تحميل</string>
+    <!-- التسميات -->
+    <string name="label_input_control_parameters">معلمات التحكم في الإدخال:</string>
+    <string name="label_parameters">المعلمات</string>
+    <string name="label_load_temporarily">تحميل مؤقت</string>
+    <string name="label_show_system_app">إظهار تطبيق النظام</string>
+    <string name="label_system_default">افتراضي النظام</string>
+    <string name="label_trigger_event">تشغيل الحدث</string>
+    <!-- الحالة -->
+    <string name="status_not_installed">غير مثبت</string>
+    <string name="status_working">يعمل 😋</string>
+    <string name="status_loading">جاري التحميل...</string>
+    <!-- معلومات -->
+    <string name="info_kernel_version">إصدار النواة</string>
+    <string name="info_system_version">إصدار النظام</string>
+    <string name="info_fingerprint">البصمة</string>
+    <string name="info_selinux_status">حالة SELinux</string>
+    <string name="info_version">الإصدار: %1$s</string>
+    <string name="info_time">الوقت: %1$s</string>
+    <string name="info_config">التكوين: %1$s</string>
+    <string name="info_slot">الفتحة: %1$s</string>
+    <string name="info_device">الجهاز: %1$s</string>
+    <string name="info_device_unknown">الجهاز: غير معروف</string>
+    <string name="info_author">المطور: %1$s</string>
+    <string name="info_args">Args: %1$s</string>
+    <string name="info_no_description">لا يوجد وصف</string>
+    <string name="info_embedded">مضمن</string>
+    <string name="info_user">المستخدم %1$s</string>
+    <string name="info_system">النظام</string>
+    <!-- الرسائل -->
+    <string name="msg_no_module_loaded">لم يتم تحميل أي إضافة</string>
+    <string name="msg_no_app_found">لم يتم العثور على أي تطبيق</string>
+    <string name="msg_no_module_found">لم يتم العثور على أي إضافة</string>
+    <string name="msg_module_loaded">سيتم تحميل %1$s.</string>
+    <string name="msg_unload_module">هل تريد إلغاء تحميل إضافة %1$s؟</string>
+    <string name="msg_redirecting_to">إعادة التوجيه إلى %1$s</string>
+    <string name="msg_failed_open_link">فشل فتح الرابط بواسطة exec</string>
+    <string name="msg_failed_parse_kernel">فشل تحليل النواة:</string>
+    <string name="msg_boot_extract_failed">فشل استخراج boot image</string>
+    <string name="msg_failed_locate_boot">فشل تحديد موقع Boot image</string>
+    <string name="msg_invalid_kpm_file">ملف KPM غير صالح</string>
+    <string name="msg_could_not_parse_kpm">تعذر تحليل معلومات KPM</string>
+    <string name="msg_error_no_boot_image">خطأ: لم يتم العثور على Boot image.</string>
+    <string name="msg_please_select_file">يرجى تحديد ملف %1$s</string>
+    <string name="msg_please_wait">يرجى الانتظار...</string>
+    <string name="msg_uploading">جاري التحميل... </string>
+    <string name="msg_upload_cancelled">تم إلغاء التحميل</string>
+    <string name="msg_error">خطأ: %1$s</string>
+    <string name="msg_successfully_loaded">تم تحميل %1$s بنجاح</string>
+    <string name="msg_failed_load_module">فشل تحميل الإضافة %1$s</string>
+    <string name="msg_failed_get_module_info">فشل الحصول على معلومات الإضافة</string>
+    <string name="msg_error_loading_apps">خطأ في تحميل التطبيقات: </string>
+    <string name="msg_error_rendering_apps">حدث خطأ في عرض التطبيقات: </string>
+    <string name="msg_unknown">غير معروف</string>
+</resources>
