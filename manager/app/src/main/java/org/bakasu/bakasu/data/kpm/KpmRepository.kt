@@ -318,7 +318,7 @@ fi
             stage.copyRecursively(webroot, overwrite = true)
             stage.deleteRecursively()
 
-            org.bakasu.bakasu.ui.webui.BuiltinWebUI.register(root, "KPM 管理界面")
+            org.bakasu.bakasu.ui.webui.BuiltinWebUI.register(root, "KPM")
 
             // WebUI 里调用的是裸命令 kpatch，需要它在 root shell 的 PATH 中；
             Shell.cmd(
