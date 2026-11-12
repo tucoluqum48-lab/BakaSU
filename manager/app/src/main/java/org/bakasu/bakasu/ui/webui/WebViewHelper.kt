@@ -44,7 +44,10 @@ internal suspend fun prepareWebView(
     colorsCssProvider: () -> String,
 ) {
     withContext(Dispatchers.IO) {
-        val moduleInfo = try {
+        val builtinRoot = BuiltinWebUI.rootFor(moduleId)
+        val moduleInfo = if (builtinRoot != null) {
+            BuiltinWebUI.info()
+        } else try {
             webUiRepository.getModuleInfo(moduleId)
         } catch (error: Exception) {
             if (error is CancellationException) throw error
@@ -63,7 +66,7 @@ internal suspend fun prepareWebView(
             return@withContext
         }
 
-        if (!moduleInfo.hasWebUi || !moduleInfo.enabled || moduleInfo.remove) {
+        if (builtinRoot == null && (!moduleInfo.hasWebUi || !moduleInfo.enabled || moduleInfo.remove)) {
             withContext(Dispatchers.Main) {
                 webUIState.uiEvent = WebUIEvent.Error(activity.getString(R.string.module_unavailable, moduleInfo.name))
             }
@@ -75,7 +78,7 @@ internal suspend fun prepareWebView(
         }
         withContext(Dispatchers.Main) {
             webUIState.moduleName = moduleInfo.name
-            webUIState.modDir = "/data/adb/modules/$moduleId"
+            webUIState.modDir = builtinRoot?.absolutePath ?: "/data/adb/modules/$moduleId"
 
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
                 @Suppress("DEPRECATION")
@@ -101,18 +104,20 @@ internal suspend fun prepareWebView(
             }
 
             val webRoot = File("${webUIState.modDir}/webroot")
+            val pathHandler = if (builtinRoot != null) {
+                WebViewAssetLoader.InternalStoragePathHandler(activity, webRoot)
+            } else {
+                SuFilePathHandler(
+                    webRoot,
+                    webUiRepository,
+                    { webUIState.currentInsets },
+                    { enable -> webUIState.isInsetsEnabled = enable },
+                    colorsCssProvider,
+                )
+            }
             val webViewAssetLoader = WebViewAssetLoader.Builder()
                 .setDomain("mui.kernelsu.org")
-                .addPathHandler(
-                    "/",
-                    SuFilePathHandler(
-                        webRoot,
-                        webUiRepository,
-                        { webUIState.currentInsets },
-                        { enable -> webUIState.isInsetsEnabled = enable },
-                        colorsCssProvider,
-                    ),
-                )
+                .addPathHandler("/", pathHandler)
                 .build()
 
             // WebViewClient
