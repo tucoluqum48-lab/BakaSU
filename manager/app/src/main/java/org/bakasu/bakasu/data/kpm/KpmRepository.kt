@@ -28,6 +28,8 @@ class KpmRepository(private val context: android.content.Context) {
         const val BOOT_SCRIPT = "/data/adb/service.d/99-kpm-autoload.sh"
         /** 应用级排除列表：每行一个 UID（内核侧不持久化，开机由脚本重放） */
         const val EXCLUDE_APPS = "$TOOL_DIR/exclude_apps.list"
+        /** 内置 WebUI 的伪模块目录名（无 service.sh，不参与开机加载） */
+        const val WEBUI_MODULE_ID = "kpmwebui"
         const val ASSET_NAME = "kpatch-arm64"
 
         /** 模块路径：仅作为自举前的兜底 */
@@ -205,6 +207,53 @@ fi
             if (!saved.isSuccess) return@withContext true to (text + " ｜但写配置失败：" + note)
             true to (if (excluded) "已排除 UID " else "已取消排除 UID ") + uid
         }
+
+    /** 递归把 assets 目录写到本地 File */
+    private fun copyAssetDir(assetPath: String, dest: File) {
+        val am = context.assets
+        val children = am.list(assetPath).orEmpty()
+        if (children.isEmpty()) {
+            dest.parentFile?.mkdirs()
+            am.open(assetPath).use { input -> dest.outputStream().use { input.copyTo(it) } }
+            return
+        }
+        dest.mkdirs()
+        for (name in children) copyAssetDir("$assetPath/$name", File(dest, name))
+    }
+
+    /**
+     * 部署内置 KPM 管理界面（原版 WebUI）：
+     * 1) 把 assets/kpmwebui 释放成 /data/adb/modules/kpmwebui/webroot；
+     * 2) 补一份 module.prop，管理器的 WebUI 读取器要求它存在；
+     * 3) 把 kpatch 软链到 /data/adb/ksu/bin，保证 WebUI 里 `kpatch ...` 能走 PATH。
+     * 该目录不含任何 .sh，不会在开机时做任何事。
+     */
+    suspend fun ensureWebUiModule(): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val staged = File(context.cacheDir, "kpmwebui")
+            if (staged.exists()) staged.deleteRecursively()
+            copyAssetDir("kpmwebui", staged)
+            File(staged, "module.prop").writeText(
+                """
+                id=$WEBUI_MODULE_ID
+                name=KPM 管理界面
+                version=builtin
+                versionCode=1
+                author=BakaSU
+                description=管理器内置的 KPM 管理界面（WebUI）。不含开机脚本，请勿删除。
+                """.trimIndent() + "\n",
+            )
+
+            val dest = "/data/adb/modules/$WEBUI_MODULE_ID"
+            val cmd = Shell.cmd(
+                "mkdir -p " + dest + " /data/adb/ksu/bin" +
+                    " && cp -rf " + quote(staged.absolutePath) + "/. " + dest + "/" +
+                    " && chmod -R 755 " + dest +
+                    " && ln -sf " + SELF_MANAGED_BIN + " /data/adb/ksu/bin/kpatch",
+            ).exec()
+            cmd.isSuccess
+        }.getOrDefault(false)
+    }
 
     /** 始终按最新模板重写开机脚本（幂等） */
     suspend fun writeBootScript(): Boolean = withContext(Dispatchers.IO) {
