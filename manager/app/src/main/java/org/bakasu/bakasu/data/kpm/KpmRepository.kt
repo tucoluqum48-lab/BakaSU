@@ -31,6 +31,8 @@ class KpmRepository(private val context: android.content.Context) {
         /** 内置 WebUI 放在 app 私有目录，不落 /data/adb/modules */
         const val WEBUI_DIR = "kpmwebui"
         const val ASSET_NAME = "kpatch-arm64"
+        /** 随 APK 一起发布的内置工具链（重装后自动补齐） */
+        val BUNDLED_BINS = listOf("kpimg", "kptools", "magiskboot")
 
         /** 模块路径：仅作为自举前的兜底 */
         val FALLBACK_BIN = "/data/adb/modules/KPatch-Next/bin/kpatch"
@@ -108,8 +110,34 @@ fi
                         " && chmod 755 " + quote(BOOT_SCRIPT),
                 ).exec()
             }
+            // 其余内置工具链：缺哪个补哪个（重装/清数据后自动恢复）
+            deployBundledBins()
+
             // 始终按最新模板重写一次，保证开机重放排除列表的逻辑存在
             writeBootScript()
+        }.getOrDefault(false)
+    }
+
+    /** 把 assets/kpmbin 下的工具链补齐到 BIN_DIR（已存在则跳过） */
+    private suspend fun deployBundledBins(): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            Shell.cmd("mkdir -p " + BIN_DIR).exec()
+            for (name in BUNDLED_BINS) {
+                val target = BIN_DIR + "/" + name
+                val present = Shell.cmd("test -s " + quote(target)).exec().isSuccess
+                if (present) continue
+                val cache = File(context.cacheDir, name)
+                runCatching {
+                    context.assets.open("kpmbin/" + name).use { input ->
+                        cache.outputStream().use { output -> input.copyTo(output) }
+                    }
+                }.getOrElse { continue }
+                Shell.cmd(
+                    "cp " + quote(cache.absolutePath) + " " + quote(target) +
+                        " && chmod 755 " + quote(target),
+                ).exec()
+            }
+            true
         }.getOrDefault(false)
     }
 
