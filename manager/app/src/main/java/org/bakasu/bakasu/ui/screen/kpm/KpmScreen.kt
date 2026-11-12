@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -46,6 +47,8 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import java.io.File
 import org.bakasu.bakasu.data.kpm.KpmModule
 import org.bakasu.bakasu.data.kpm.KpmRepository
@@ -74,8 +77,10 @@ fun KpmScreen() {
     var ctlTarget by remember { mutableStateOf<KpmModule?>(null) }
     var pendingFile by remember { mutableStateOf<File?>(null) }
     var persistentFiles by remember { mutableStateOf<List<String>>(emptyList()) }
-    var excluded by remember { mutableStateOf<Set<String>>(emptySet()) }
     var ctlArgs by remember { mutableStateOf("") }
+    var showExclude by remember { mutableStateOf(false) }
+    var excludedUids by remember { mutableStateOf<Set<Int>>(emptySet()) }
+    var installedApps by remember { mutableStateOf<List<Triple<Int, String, String>>>(emptyList()) }
 
     fun refresh() {
         scope.launch {
@@ -89,7 +94,6 @@ fun KpmScreen() {
                 modules = repo.listNames().mapNotNull { repo.info(it) }
             }
             persistentFiles = repo.persistentList()
-            excluded = repo.excludeList()
             loading = false
         }
     }
@@ -134,6 +138,27 @@ fun KpmScreen() {
         }
     }
 
+    fun loadExcludeApps() {
+        scope.launch {
+            val pm = appContext.packageManager
+            installedApps = withContext(Dispatchers.IO) {
+                runCatching {
+                    pm.getInstalledApplications(PackageManager.GET_META_DATA)
+                        .filter { (it.flags and ApplicationInfo.FLAG_SYSTEM) == 0 }
+                        .map {
+                            Triple(
+                                it.uid,
+                                runCatching { pm.getApplicationLabel(it).toString() }.getOrDefault(it.packageName),
+                                it.packageName,
+                            )
+                        }
+                        .sortedBy { it.second.lowercase() }
+                }.getOrDefault(emptyList())
+            }
+            excludedUids = repo.excludedUids()
+        }
+    }
+
     LaunchedEffect(Unit) { refresh() }
 
     Scaffold(
@@ -169,6 +194,11 @@ fun KpmScreen() {
             TextButton(onClick = { refresh() }) { Text("刷新") }
             Spacer(Modifier.width(4.dp))
             TextButton(onClick = { pickKpm.launch(arrayOf("*/*")) }) { Text("加载 .kpm") }
+            Spacer(Modifier.width(4.dp))
+            TextButton(onClick = {
+                showExclude = true
+                loadExcludeApps()
+            }) { Text("排除应用") }
         }
 
         if (message.isNotEmpty()) {
@@ -202,7 +232,7 @@ fun KpmScreen() {
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        "来自 " + repo.persistentDir + " · 勾选「排除」则开机不加载（文件保留）",
+                        "来自 " + repo.persistentDir,
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -212,17 +242,6 @@ fun KpmScreen() {
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Text(name, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                            Text("排除", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Checkbox(
-                                checked = excluded.contains(name),
-                                onCheckedChange = { checked ->
-                                    scope.launch {
-                                        val r = repo.setExcluded(name, checked)
-                                        message = if (r.first) r.second else "设置失败：" + r.second
-                                        refresh()
-                                    }
-                                },
-                            )
                             TextButton(onClick = {
                                 scope.launch {
                                     val r = repo.removePersistent(name)
@@ -311,6 +330,60 @@ fun KpmScreen() {
                         refresh()
                     }
                 }) { Text("开机自动加载") }
+            },
+        )
+    }
+
+    if (showExclude) {
+        AlertDialog(
+            onDismissRequest = { showExclude = false },
+            title = { Text("排除应用") },
+            text = {
+                Column {
+                    Text(
+                        "被排除的应用不会被 KPM 注入（等价于 kpatch exclude_set <uid> 1）。",
+                        fontSize = 12.sp,
+                    )
+                    Text(
+                        "已排除 " + excludedUids.size + " 个 · 仅列用户应用",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                        items(installedApps) { (uid, label, pkg) ->
+                            Row(
+                                Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(Modifier.weight(1f)) {
+                                    Text(label, fontSize = 13.sp)
+                                    Text(
+                                        pkg + " · " + uid,
+                                        fontSize = 10.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Checkbox(
+                                    checked = excludedUids.contains(uid),
+                                    onCheckedChange = { checked ->
+                                        scope.launch {
+                                            val r = repo.setAppExcluded(uid, checked)
+                                            message = if (r.first) r.second else "设置失败：" + r.second
+                                            excludedUids = repo.excludedUids()
+                                        }
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showExclude = false
+                    refresh()
+                }) { Text("完成") }
             },
         )
     }
