@@ -252,6 +252,49 @@ fi
         r.out.map { it.trim() }.filter { it.endsWith(".kpm") }
     }
 
+    /** 递归把 assets 目录写到本地 File */
+    private fun copyAssetDir(assetPath: String, dest: File) {
+        val am = context.assets
+        val children = am.list(assetPath).orEmpty()
+        if (children.isEmpty()) {
+            dest.parentFile?.mkdirs()
+            am.open(assetPath).use { input -> dest.outputStream().use { input.copyTo(it) } }
+            return
+        }
+        dest.mkdirs()
+        for (name in children) copyAssetDir("$assetPath/$name", File(dest, name))
+    }
+
+    /**
+     * 部署内置 KPM 管理界面（原版 WebUI）到 app 私有目录：
+     * - 释放 assets/kpmwebui → filesDir/kpmwebui/webroot
+     * - 登记到 BuiltinWebUI，WebViewHelper 会直接加载它（不创建任何模块目录）
+     * - 把 kpatch 软链到 /data/adb/ksu/bin，保证界面里 `kpatch ...` 走 PATH
+     */
+    suspend fun ensureWebUiModule(): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val root = File(context.filesDir, WEBUI_DIR)
+            val stage = File(context.cacheDir, "kpmwebui-assets")
+            if (stage.exists()) stage.deleteRecursively()
+            copyAssetDir("kpmwebui", stage)
+
+            val webroot = File(root, "webroot")
+            if (webroot.exists()) webroot.deleteRecursively()
+            webroot.mkdirs()
+            stage.copyRecursively(webroot, overwrite = true)
+            stage.deleteRecursively()
+
+            org.bakasu.bakasu.ui.webui.BuiltinWebUI.register(root, "KPM")
+
+            // WebUI 里调用的是裸命令 kpatch，需要它在 root shell 的 PATH 中；
+            Shell.cmd(
+                "mkdir -p /data/adb/ksu/bin " + BIN_DIR +
+                    " && ln -sf " + SELF_MANAGED_BIN + " /data/adb/ksu/bin/kpatch",
+            ).exec()
+            webroot.isDirectory
+        }.getOrDefault(false)
+    }
+
     /** 始终按最新模板重写开机脚本（幂等） */
     suspend fun writeBootScript(): Boolean = withContext(Dispatchers.IO) {
         runCatching {
