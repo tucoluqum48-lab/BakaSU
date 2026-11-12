@@ -1,4 +1,5 @@
 #!/system/bin/sh
+# shellcheck disable=SC2068,SC2045,SC2034,SC1090,SC1091
 #######################################################################################
 # Helper Functions (credits to topjohnwu)
 # Imported from https://github.com/bmax121/APatch/blob/main/app/src/main/assets/util_functions.sh
