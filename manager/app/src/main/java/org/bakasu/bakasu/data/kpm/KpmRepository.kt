@@ -26,6 +26,8 @@ class KpmRepository(private val context: android.content.Context) {
         const val BIN_DIR = "$TOOL_DIR/bin"
         const val KPM_DIR = "$TOOL_DIR/kpm"
         const val BOOT_SCRIPT = "/data/adb/service.d/99-kpm-autoload.sh"
+        /** 开机自动加载的排除列表：每行一个 .kpm 文件名 */
+        const val EXCLUDE_LIST = "$TOOL_DIR/exclude.list"
         const val ASSET_NAME = "kpatch-arm64"
 
         /** 模块路径：仅作为自举前的兜底 */
@@ -64,8 +66,13 @@ class KpmRepository(private val context: android.content.Context) {
 # 由 BakaSU 的 KPM 页面生成：开机自动加载 /data/adb/kpm-tool/kpm/*.kpm
 [ -x /data/adb/kpm-tool/bin/kpatch ] || exit 0
 until [ "${'$'}(getprop sys.boot_completed)" = "1" ]; do sleep 1; done
+EXCLUDE=/data/adb/kpm-tool/exclude.list
 for f in /data/adb/kpm-tool/kpm/*.kpm; do
     [ -s "${'$'}f" ] || continue
+    if [ -f "${'$'}EXCLUDE" ] && grep -qxF "${'$'}(basename "${'$'}f")" "${'$'}EXCLUDE" 2>/dev/null; then
+        echo "skip(excluded): ${'$'}f" >> /data/adb/kpm-tool/autoload.log
+        continue
+    fi
     /data/adb/kpm-tool/bin/kpatch kpm load "${'$'}f" >> /data/adb/kpm-tool/autoload.log 2>&1
 done
 """.trimIndent()
@@ -98,7 +105,8 @@ done
                         " && chmod 755 " + quote(BOOT_SCRIPT),
                 ).exec()
             }
-            true
+            // 无论是否刚释放二进制，都按最新模板重写一次开机脚本，保证排除逻辑生效
+            writeBootScript()
         }.getOrDefault(false)
     }
 
@@ -158,6 +166,48 @@ done
     suspend fun persistentList(): List<String> = withContext(Dispatchers.IO) {
         val r = Shell.cmd("ls -1 " + persistentDir + " 2>/dev/null").exec()
         r.out.map { it.trim() }.filter { it.endsWith(".kpm") }
+    }
+
+    /** 读取开机自动加载的排除列表（每行一个文件名） */
+    suspend fun excludeList(): Set<String> = withContext(Dispatchers.IO) {
+        val r = Shell.cmd("cat " + EXCLUDE_LIST + " 2>/dev/null").exec()
+        r.out.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    }
+
+    /** 把指定文件名加入/移出排除列表；改完立即重写开机脚本 */
+    suspend fun setExcluded(name: String, excluded: Boolean): Pair<Boolean, String> =
+        withContext(Dispatchers.IO) {
+            if (name.isBlank()) return@withContext false to "文件名为空"
+            val cmd = buildString {
+                append("mkdir -p ").append(TOOL_DIR).append(" && { ")
+                append("touch ").append(EXCLUDE_LIST).append(" && ")
+                if (excluded) {
+                    append("grep -qxF ").append(quote(name)).append(" ").append(EXCLUDE_LIST)
+                    append(" || echo ").append(quote(name)).append(" >> ").append(EXCLUDE_LIST)
+                } else {
+                    append("grep -vxF ").append(quote(name)).append(" ").append(EXCLUDE_LIST)
+                    append(" > ").append(EXCLUDE_LIST).append(".tmp; ")
+                    append("mv ").append(EXCLUDE_LIST).append(".tmp ").append(EXCLUDE_LIST)
+                }
+                append("; }")
+            }
+            val r = Shell.cmd(cmd).exec()
+            if (!r.isSuccess) return@withContext false to (r.out + r.err).joinToString(" ").trim()
+            writeBootScript()
+            true to (if (excluded) "已排除 " else "已取消排除 ") + name
+        }
+
+    /** 始终按最新模板重写开机脚本（幂等） */
+    suspend fun writeBootScript(): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            val script = File(context.cacheDir, "99-kpm-autoload.sh")
+            script.writeText(bootScriptBody)
+            Shell.cmd(
+                "mkdir -p /data/adb/service.d" +
+                    " && cp " + quote(script.absolutePath) + " " + quote(BOOT_SCRIPT) +
+                    " && chmod 755 " + quote(BOOT_SCRIPT),
+            ).exec().isSuccess
+        }.getOrDefault(false)
     }
 
     /**
