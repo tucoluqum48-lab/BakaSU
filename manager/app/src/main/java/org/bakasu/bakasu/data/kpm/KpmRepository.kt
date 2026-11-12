@@ -26,8 +26,8 @@ class KpmRepository(private val context: android.content.Context) {
         const val BIN_DIR = "$TOOL_DIR/bin"
         const val KPM_DIR = "$TOOL_DIR/kpm"
         const val BOOT_SCRIPT = "/data/adb/service.d/99-kpm-autoload.sh"
-        /** 开机自动加载的排除列表：每行一个 .kpm 文件名 */
-        const val EXCLUDE_LIST = "$TOOL_DIR/exclude.list"
+        /** 应用级排除列表：每行一个 UID（内核侧不持久化，开机由脚本重放） */
+        const val EXCLUDE_APPS = "$TOOL_DIR/exclude_apps.list"
         const val ASSET_NAME = "kpatch-arm64"
 
         /** 模块路径：仅作为自举前的兜底 */
@@ -66,15 +66,17 @@ class KpmRepository(private val context: android.content.Context) {
 # 由 BakaSU 的 KPM 页面生成：开机自动加载 /data/adb/kpm-tool/kpm/*.kpm
 [ -x /data/adb/kpm-tool/bin/kpatch ] || exit 0
 until [ "${'$'}(getprop sys.boot_completed)" = "1" ]; do sleep 1; done
-EXCLUDE=/data/adb/kpm-tool/exclude.list
 for f in /data/adb/kpm-tool/kpm/*.kpm; do
     [ -s "${'$'}f" ] || continue
-    if [ -f "${'$'}EXCLUDE" ] && grep -qxF "${'$'}(basename "${'$'}f")" "${'$'}EXCLUDE" 2>/dev/null; then
-        echo "skip(excluded): ${'$'}f" >> /data/adb/kpm-tool/autoload.log
-        continue
-    fi
     /data/adb/kpm-tool/bin/kpatch kpm load "${'$'}f" >> /data/adb/kpm-tool/autoload.log 2>&1
 done
+# 应用级排除：内核不持久化，开机重放一遍
+if [ -s /data/adb/kpm-tool/exclude_apps.list ]; then
+    while read -r u; do
+        [ -n "${'$'}u" ] || continue
+        /data/adb/kpm-tool/bin/kpatch exclude_set "${'$'}u" 1 >> /data/adb/kpm-tool/autoload.log 2>&1
+    done < /data/adb/kpm-tool/exclude_apps.list
+fi
 """.trimIndent()
 
     /**
@@ -105,7 +107,7 @@ done
                         " && chmod 755 " + quote(BOOT_SCRIPT),
                 ).exec()
             }
-            // 无论是否刚释放二进制，都按最新模板重写一次开机脚本，保证排除逻辑生效
+            // 始终按最新模板重写一次，保证开机重放排除列表的逻辑存在
             writeBootScript()
         }.getOrDefault(false)
     }
@@ -168,33 +170,40 @@ done
         r.out.map { it.trim() }.filter { it.endsWith(".kpm") }
     }
 
-    /** 读取开机自动加载的排除列表（每行一个文件名） */
-    suspend fun excludeList(): Set<String> = withContext(Dispatchers.IO) {
-        val r = Shell.cmd("cat " + EXCLUDE_LIST + " 2>/dev/null").exec()
-        r.out.map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+    /** 已排除的 UID 集合（来自本机配置文件） */
+    suspend fun excludedUids(): Set<Int> = withContext(Dispatchers.IO) {
+        val r = Shell.cmd("cat " + EXCLUDE_APPS + " 2>/dev/null").exec()
+        r.out.mapNotNull { it.trim().toIntOrNull() }.toSet()
     }
 
-    /** 把指定文件名加入/移出排除列表；改完立即重写开机脚本 */
-    suspend fun setExcluded(name: String, excluded: Boolean): Pair<Boolean, String> =
+    /**
+     * 设置某个 UID 的排除状态：
+     * 1) 立即下发 exclude_set 到内核；
+     * 2) 同步写配置文件，供开机脚本重放（内核侧不持久化）。
+     */
+    suspend fun setAppExcluded(uid: Int, excluded: Boolean): Pair<Boolean, String> =
         withContext(Dispatchers.IO) {
-            if (name.isBlank()) return@withContext false to "文件名为空"
-            val cmd = buildString {
-                append("mkdir -p ").append(TOOL_DIR).append(" && { ")
-                append("touch ").append(EXCLUDE_LIST).append(" && ")
+            val flag = if (excluded) "1" else "0"
+            val apply = Shell.cmd(binaryPath + " exclude_set " + uid + " " + flag).exec()
+            val text = (if (apply.out.isNotEmpty()) apply.out else apply.err).joinToString(" ").trim()
+            if (!apply.isSuccess) return@withContext false to (text.ifEmpty { "exclude_set 执行失败" })
+
+            val write = buildString {
+                append("mkdir -p ").append(TOOL_DIR).append(" && touch ").append(EXCLUDE_APPS).append(" && { ")
                 if (excluded) {
-                    append("grep -qxF ").append(quote(name)).append(" ").append(EXCLUDE_LIST)
-                    append(" || echo ").append(quote(name)).append(" >> ").append(EXCLUDE_LIST)
+                    append("grep -qxF ").append(uid.toString()).append(" ").append(EXCLUDE_APPS)
+                    append(" || echo ").append(uid.toString()).append(" >> ").append(EXCLUDE_APPS)
                 } else {
-                    append("grep -vxF ").append(quote(name)).append(" ").append(EXCLUDE_LIST)
-                    append(" > ").append(EXCLUDE_LIST).append(".tmp; ")
-                    append("mv ").append(EXCLUDE_LIST).append(".tmp ").append(EXCLUDE_LIST)
+                    append("grep -vxF ").append(uid.toString()).append(" ").append(EXCLUDE_APPS)
+                    append(" > ").append(EXCLUDE_APPS).append(".tmp; ")
+                    append("mv ").append(EXCLUDE_APPS).append(".tmp ").append(EXCLUDE_APPS)
                 }
                 append("; }")
             }
-            val r = Shell.cmd(cmd).exec()
-            if (!r.isSuccess) return@withContext false to (r.out + r.err).joinToString(" ").trim()
-            writeBootScript()
-            true to (if (excluded) "已排除 " else "已取消排除 ") + name
+            val saved = Shell.cmd(write).exec()
+            val note = (if (saved.out.isNotEmpty()) saved.out else saved.err).joinToString(" ").trim()
+            if (!saved.isSuccess) return@withContext true to (text + " ｜但写配置失败：" + note)
+            true to (if (excluded) "已排除 UID " else "已取消排除 UID ") + uid
         }
 
     /** 始终按最新模板重写开机脚本（幂等） */
