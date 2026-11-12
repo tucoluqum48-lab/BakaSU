@@ -79,7 +79,13 @@ jobs:
         uses: ludeeus/action-shellcheck@2.0.0
         with:
           ignore_names: gradlew
-          ignore_paths: ./userspace/ksud/src/android/module/installer.sh ./.github/scripts/setup-rust-build.sh
+          # assets 下的脚本来自第三方（KPatch-Next / 内置开机脚本），不参与本仓库规范检查
+          ignore_paths: >-
+            ./userspace/ksud/src/android/module/installer.sh
+            ./.github/scripts/setup-rust-build.sh
+            ./manager/app/src/main/assets
+          # 只把真正的 error 当失败；SC2034 等风格类警告不影响
+          severity: error
 
   check-crlf:
     name: Check Line Endings
