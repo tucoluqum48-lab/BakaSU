@@ -44,6 +44,8 @@ class KpmRepository(private val context: android.content.Context) {
             "97-color-saturation.sh" to "/data/adb/service.d/97-color-saturation.sh",
             // WebUI 的 rehook 开关会调用 sh /data/adb/kpm-tool/status.sh
             "status.sh" to "/data/adb/kpm-tool/status.sh",
+            // 关掉 binder 调试日志（内核默认 debug_mask=7，会刷爆 dmesg）
+            "96-binder-quiet.sh" to "/data/adb/service.d/96-binder-quiet.sh",
         )
 
         /** 模块路径：仅作为自举前的兜底 */
