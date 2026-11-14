@@ -1,12 +1,20 @@
 #!/system/bin/sh
 # /data/adb/service.d/96-hide-ko.sh
 #
-# 把 /data/adb/modules 下第三方 ko 的 /proc/modules + /proc/kallsyms 痕迹抹掉。
+# 把 /data/adb 下第三方 ko 的痕迹抹掉（/proc/modules、/proc/kallsyms、/sys/module）。
 #
 # 原理：
-#   内核补丁编译期只写了 qpace_drv / qpace_zram（开机瞬间就生效），
-#   之后新装的 ko 由本脚本扫描 /data/adb/modules 自动登记到 /proc/susfs_hide_modules，
-#   无需重新编译内核。
+#   内核编译期名单是空的（通用版），实际名单由本脚本扫描 /data/adb 递归查找
+#   所有 .ko，把"此刻真的加载在内核里"的那些登记到 /proc/susfs_hide_modules。
+#   登记后内核会同时处理三处：
+#     · /proc/modules 整行不输出（含 root）
+#     · /proc/kallsyms 相关符号消失（含 root）
+#     · /sys/module/<name> 非 root ENOENT（strict 位）
+#
+#   扫描范围是 /data/adb（包含子目录 modules），所以下面两种位置都能覆盖：
+#     /data/adb/abc.ko
+#     /data/adb/modules/xxx/abc.ko
+#   厂商自带同名模块（/vendor/lib/modules/<name>.ko）会被跳过，避免误藏。
 #
 # 生效时机：
 #   · 开机：post-fs-data.d 之后（本脚本在 service.d，模块此时已 insmod）
