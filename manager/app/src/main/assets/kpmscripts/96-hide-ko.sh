@@ -5,7 +5,7 @@
 #
 # 原理：
 #   内核编译期名单是空的（通用版），实际名单由本脚本扫描 /data/adb 递归查找
-#   所有 .ko，把"此刻真的加载在内核里"的那些登记到 /proc/susfs_hide_modules。
+#   所有 .ko，把"此刻真的加载在内核里"的那些登记到 /proc/oplus_mem_zone。
 #   登记后内核会同时处理三处：
 #     · /proc/modules 整行不输出（含 root）
 #     · /proc/kallsyms 相关符号消失（含 root）
@@ -22,7 +22,7 @@
 #
 # 日志：/data/adb/hide-ko/state.log（0700，仅 root）
 
-CTL=/proc/susfs_hide_modules
+CTL=/proc/oplus_mem_zone
 LOGDIR=/data/adb/hide-ko
 LOG=$LOGDIR/state.log
 MODDIR=/data/adb
