@@ -52,5 +52,3 @@ done
 
 echo "--- result ---" >> "$LOG"
 "$KP" kpm ctl0 UidHide "list" >> "$LOG" 2>&1
-
-[EXIT=0]
