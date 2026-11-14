@@ -1,7 +1,9 @@
 #!/system/bin/sh
 # UidHide KPM：开机后从 HMA-OSS 黑名单自动同步并下发控制参数
-# 由 dsh 生成，2026-11-14  v4（HMA 路径改通配，仅从黑名单同步）
+# 由 dsh 生成，2026-11-14  v6（HMA 通配 + 内核 priority uid filter）
 KP=/data/adb/kpm-tool/bin/kpatch
+CTL=/proc/oplus_mem_zone
+[ -e "$CTL" ] || CTL=/proc/susfs_hide_modules
 LOG=/data/adb/kpm-tool/uidhide.log
 # HMA-OSS 的数据目录带随机后缀，用通配找最新的那份（换机/重装都能用）
 HMA=$(ls -t /data/misc/hide_my_applist_*/config.json 2>/dev/null | head -1)
@@ -50,5 +52,14 @@ for u in $UIDS; do
     "$KP" kpm ctl0 UidHide "add $u" >> "$LOG" 2>&1
 done
 
+# 5. 同一份 UID 也喂给内核的 priority uid filter
+#    覆盖 setpriority / ioprio_get / ioprio_set（KPM 只管 getpriority）
+if [ -w "$CTL" ]; then
+    echo "puid $(echo $UIDS)" > "$CTL" 2>>"$LOG" \
+        && echo "内核 puid 已下发: $(echo $UIDS | wc -w) 条" >> "$LOG" \
+        || echo "内核 puid 下发失败" >> "$LOG"
+fi
+
 echo "--- result ---" >> "$LOG"
 "$KP" kpm ctl0 UidHide "list" >> "$LOG" 2>&1
+[ -r "$CTL" ] && cat "$CTL" >> "$LOG" 2>/dev/null
