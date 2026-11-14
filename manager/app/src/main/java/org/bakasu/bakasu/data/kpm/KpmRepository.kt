@@ -44,6 +44,8 @@ class KpmRepository(private val context: android.content.Context) {
             "97-color-saturation.sh" to "/data/adb/service.d/97-color-saturation.sh",
             // WebUI 的 rehook 开关会调用 sh /data/adb/kpm-tool/status.sh
             "status.sh" to "/data/adb/kpm-tool/status.sh",
+            // 扫描 /data/adb/modules 下的 ko 并登记到 /proc/susfs_hide_modules
+            "96-hide-ko.sh" to "/data/adb/service.d/96-hide-ko.sh",
         )
 
         /** 模块路径：仅作为自举前的兜底 */
