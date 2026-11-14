@@ -1,9 +1,10 @@
 #!/system/bin/sh
 # UidHide KPM：开机后从 HMA-OSS 黑名单自动同步并下发控制参数
-# 由 dsh 生成，2026-11-12  v3（仅从 HMA 黑名单同步，无回退列表）
+# 由 dsh 生成，2026-11-14  v4（HMA 路径改通配，仅从黑名单同步）
 KP=/data/adb/kpm-tool/bin/kpatch
 LOG=/data/adb/kpm-tool/uidhide.log
-HMA=/data/misc/hide_my_applist_mjmfawssrhwqnrnf/config.json
+# HMA-OSS 的数据目录带随机后缀，用通配找最新的那份（换机/重装都能用）
+HMA=$(ls -t /data/misc/hide_my_applist_*/config.json 2>/dev/null | head -1)
 
 [ -x "$KP" ] || exit 0
 
@@ -51,3 +52,5 @@ done
 
 echo "--- result ---" >> "$LOG"
 "$KP" kpm ctl0 UidHide "list" >> "$LOG" 2>&1
+
+[EXIT=0]
