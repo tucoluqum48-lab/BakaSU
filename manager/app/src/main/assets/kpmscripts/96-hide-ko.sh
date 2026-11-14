@@ -23,6 +23,8 @@
 # 日志：/data/adb/hide-ko/state.log（0700，仅 root）
 
 CTL=/proc/oplus_mem_zone
+# 兼容还没刷新内核的机器（旧节点名）
+[ -e "$CTL" ] || CTL=/proc/susfs_hide_modules
 LOGDIR=/data/adb/hide-ko
 LOG=$LOGDIR/state.log
 MODDIR=/data/adb
