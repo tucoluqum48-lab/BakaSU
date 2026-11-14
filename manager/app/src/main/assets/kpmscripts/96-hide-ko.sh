@@ -17,7 +17,7 @@
 CTL=/proc/susfs_hide_modules
 LOGDIR=/data/adb/hide-ko
 LOG=$LOGDIR/state.log
-MODDIR=/data/adb/modules
+MODDIR=/data/adb
 
 # 日志放 /data/adb 下（0700 root-only），不要放 /data/local/tmp —— 那里 1777，检测方会扫
 mkdir -p "$LOGDIR"
@@ -31,6 +31,8 @@ scan_and_register() {
     n=0
     for ko in $(find "$MODDIR" -name '*.ko' -type f 2>/dev/null); do
         name=$(basename "$ko" .ko | tr '-' '_')
+        # 厂商自带同名模块不碰（避免把 zram 这类系统模块藏掉）
+        [ -f "/vendor/lib/modules/$name.ko" ] && continue
         # 只登记此刻真在内核里的，避免把同名厂商模块误伤
         if cut -d' ' -f1 /proc/modules 2>/dev/null | grep -qx "$name"; then
             if echo "add $name" > "$CTL" 2>/dev/null; then
