@@ -8,7 +8,11 @@
 #      → kpatch ctl0 UidHide，模块不在就跳过
 #
 # 数据源：HMA-OSS 黑名单（唯一的真相来源，改 HMA 即可）
-# 由 dsh 生成，2026-11-14  v7（内核与 KPM 解耦）
+# 由 dsh 生成，2026-11-16  v8（包名驱动 + 白名单）
+#   v8 新增：
+#     · papp  <包名...>  内核按包名解析 uid，重装 app 自动跟随（60s 重算）
+#     · sallow <uid...>  白名单，名单内 uid 不受 strict 位隐藏影响
+#   v8 保留 puid（立即生效的兜底），与 papp 并存互不影响
 KP=/data/adb/kpm-tool/bin/kpatch
 CTL=/proc/oplus_mem_zone
 [ -e "$CTL" ] || CTL=/proc/susfs_hide_modules
@@ -45,9 +49,24 @@ echo "包数=$(echo $PKGS | wc -w) UID:$UIDS" >> "$LOG"
 
 # 4. 下发到内核（不依赖 KPM，先做这一步）
 if [ -w "$CTL" ]; then
+    # 4a. 立即生效：直接下发 uid 位图
     echo "puid $(echo $UIDS)" > "$CTL" 2>>"$LOG" \
         && echo "内核 puid 已下发: $(echo $UIDS | wc -w) 条" >> "$LOG" \
         || echo "内核 puid 下发失败" >> "$LOG"
+
+    # 4b. 长期跟随：下发包名，内核每 60s 重解析（重装换 uid 也能跟上）
+    echo "papp $(echo $PKGS)" > "$CTL" 2>>"$LOG" \
+        && echo "内核 papp 已下发: $(echo $PKGS | wc -w) 个包名" >> "$LOG" \
+        || echo "内核 papp 下发失败（内核版本可能不支持）" >> "$LOG"
+
+    # 4c. sus_path 白名单：这些 uid 不受隐藏影响（默认空，按需放开）
+    if [ -r /data/adb/kpm-tool/sus_allow.txt ]; then
+        ALLOW=$(tr '\n' ' ' < /data/adb/kpm-tool/sus_allow.txt | tr -s ' ')
+        if [ -n "$ALLOW" ]; then
+            echo "sallow $ALLOW" > "$CTL" 2>>"$LOG" \
+                && echo "sallow 已下发: $ALLOW" >> "$LOG"
+        fi
+    fi
 else
     echo "控制节点不可写（$CTL），跳过内核下发" >> "$LOG"
 fi
