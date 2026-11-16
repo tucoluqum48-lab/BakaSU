@@ -1,0 +1,58 @@
+#!/system/bin/sh
+# uid 名单自动跟随：重装 app 换 uid 后无需重启
+#
+# 数据源优先直接读 /data/system/packages.list（root 可读，约 15ms）
+# 读不到时退回 pm list packages -U（约 33ms）
+#
+# 轮询策略：每 60 秒看一次文件 mtime（约 7ms），
+#           只有变化时才做完整解析与下发（约 33ms）。
+#           → 跟随延迟 ≤60 秒，常态开销接近 0
+
+CTL=/proc/oplus_mem_zone
+[ -e "$CTL" ] || CTL=/proc/susfs_hide_modules
+LOG=/data/adb/kpm-tool/uidhide.log
+STATE=/data/adb/kpm-tool/uid_sig
+PKGLIST=/data/system/packages.list
+
+[ -w "$CTL" ] || exit 0
+
+# $1: 包名列表（空格分隔）→ 输出 uid 列表（空格分隔、升序去重）
+resolve_uids() {
+    if [ -r "$PKGLIST" ]; then
+        awk -v list="$1" '
+            BEGIN { n=split(list, a, " "); for (i=1;i<=n;i++) if (a[i]!="") w[a[i]]=1 }
+            w[$1] && $2 ~ /^[0-9]+$/ { print $2 }
+        ' "$PKGLIST" 2>/dev/null | sort -n -u | tr '\n' ' '
+    else
+        PMDUMP=$(pm list packages -U 2>/dev/null)
+        for p in $1; do
+            echo "$PMDUMP" | sed -n "s/^package:$p uid:\([0-9]*\).*/\1/p" | head -1
+        done | sort -n -u | tr '\n' ' '
+    fi
+}
+
+LAST_MTIME=""
+while true; do
+    M=$(stat -c %Y "$PKGLIST" 2>/dev/null)
+    if [ "$M" != "$LAST_MTIME" ]; then
+        LAST_MTIME="$M"
+        HMA=$(ls -t /data/misc/hide_my_applist_*/config.json 2>/dev/null | head -1)
+        if [ -r "$HMA" ]; then
+            PKGS=$(sed -n 's/.*"appList":\[\([^]]*\)\].*/\1/p' "$HMA" 2>/dev/null \
+                | tr ',' ' ' | tr -d '"' | tr -s ' ')
+            if [ -n "$PKGS" ]; then
+                UIDS=$(resolve_uids "$PKGS")
+                SIG=$(echo "$UIDS" | md5sum | cut -d' ' -f1)
+                OLD=$(cat "$STATE" 2>/dev/null)
+
+                if [ "$SIG" != "$OLD" ] && [ -n "$(echo $UIDS)" ]; then
+                    if echo "puid $UIDS" > "$CTL" 2>/dev/null; then
+                        echo "$SIG" > "$STATE"
+                        echo "$(date) refresh: uid 变化，已重推 $(echo $UIDS | wc -w) 条" >> "$LOG"
+                    fi
+                fi
+            fi
+        fi
+    fi
+    sleep 60
+done
