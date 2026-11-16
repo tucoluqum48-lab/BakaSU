@@ -33,14 +33,21 @@ resolve_uids() {
 
 LAST_MTIME=""
 while true; do
-    M=$(stat -c %Y "$PKGLIST" 2>/dev/null)
+    HMA=$(ls -t /data/misc/hide_my_applist_*/config.json 2>/dev/null | head -1)
+    # 两个来源都要看：packages.list（app 装卸）和 HMA 配置（名单增删）
+    M="$(stat -c %Y "$PKGLIST" 2>/dev/null)-$(stat -c %Y "$HMA" 2>/dev/null)"
     if [ "$M" != "$LAST_MTIME" ]; then
         LAST_MTIME="$M"
-        HMA=$(ls -t /data/misc/hide_my_applist_*/config.json 2>/dev/null | head -1)
         if [ -r "$HMA" ]; then
             PKGS=$(sed -n 's/.*"appList":\[\([^]]*\)\].*/\1/p' "$HMA" 2>/dev/null \
                 | tr ',' ' ' | tr -d '"' | tr -s ' ')
-            if [ -n "$PKGS" ]; then
+            if [ -z "$PKGS" ]; then
+                # HMA 名单为空 → 清掉内核里的旧过滤，避免幽灵条目
+                if echo "puid clear" > "$CTL" 2>/dev/null; then
+                    rm -f "$STATE"
+                    echo "$(date) refresh: HMA 名单为空，已清空内核过滤" >> "$LOG"
+                fi
+            elif [ -n "$PKGS" ]; then
                 UIDS=$(resolve_uids "$PKGS")
                 SIG=$(echo "$UIDS" | md5sum | cut -d' ' -f1)
                 OLD=$(cat "$STATE" 2>/dev/null)
