@@ -3,7 +3,7 @@
 #
 # 两个接收方（互相独立，谁在谁干活）：
 #   ① 内核 priority uid filter（setpriority / getpriority / ioprio_set / ioprio_get）
-#      → 写 /proc/oplus_mem_zone 的 puid 命令，不依赖任何 KPM
+#      → 写 /proc/oplus_mem_zone 的 papp 命令，不依赖任何 KPM
 #   ② UidHide.kpm（只管 getpriority）
 #      → kpatch ctl0 UidHide，模块不在就跳过
 #
@@ -11,8 +11,8 @@
 # 由 dsh 生成，2026-11-16  v8（包名驱动 + 白名单）
 #   v8 新增：
 #     · papp  <包名...>  内核按包名解析 uid，重装 app 自动跟随（60s 重算）
-#     · sallow <uid...>  白名单，名单内 uid 不受 strict 位隐藏影响
-#   v8 保留 puid（立即生效的兜底），与 papp 并存互不影响
+#     · sallow <包名...> 白名单（2.4.0 按包名），名单内 app 不受 strict 位隐藏影响
+#   v9：内核升级到 SUSFS 2.4.0 后只下发 papp（上游按包名解析 uid）
 KP=/data/adb/kpm-tool/bin/kpatch
 CTL=/proc/oplus_mem_zone
 [ -e "$CTL" ] || CTL=/proc/susfs_hide_modules
@@ -48,16 +48,31 @@ echo "包数=$(echo $PKGS | wc -w) UID:$UIDS" >> "$LOG"
 [ -z "$(echo $UIDS)" ] && { echo "未解析到任何 UID，退出" >> "$LOG"; exit 0; }
 
 # 4. 下发到内核（不依赖 KPM，先做这一步）
+#    先探测内核支持哪种命令：
+#      · 含 "filter:" 行 → SUSFS 2.4.0，按包名（papp）
+#      · 含 "prio:" 行   → SUSFS 2.3.0，直接下发 uid（puid）
+#      · 都没有          → 不下发，避免被当成模块名登记
+MODE=none
 if [ -w "$CTL" ]; then
-    # 4a. 立即生效：直接下发 uid 位图
-    echo "puid $(echo $UIDS)" > "$CTL" 2>>"$LOG" \
-        && echo "内核 puid 已下发: $(echo $UIDS | wc -w) 条" >> "$LOG" \
-        || echo "内核 puid 下发失败" >> "$LOG"
+    OUT=$(cat "$CTL" 2>/dev/null)
+    case "$OUT" in
+        *"filter:"*) MODE=new ;;
+        *"prio:"*)   MODE=old ;;
+    esac
+fi
 
-    # 4b. 长期跟随：下发包名，内核每 60s 重解析（重装换 uid 也能跟上）
-    echo "papp $(echo $PKGS)" > "$CTL" 2>>"$LOG" \
-        && echo "内核 papp 已下发: $(echo $PKGS | wc -w) 个包名" >> "$LOG" \
-        || echo "内核 papp 下发失败（内核版本可能不支持）" >> "$LOG"
+if [ -w "$CTL" ] && [ "$MODE" != none ]; then
+    if [ "$MODE" = new ]; then
+        # 4a. SUSFS 2.4.0：按包名下发，内核自己解析 uid 并跟随重装
+        echo "papp $(echo $PKGS)" > "$CTL" 2>>"$LOG" \
+            && echo "内核 papp 已下发: $(echo $PKGS | wc -w) 个包名" >> "$LOG" \
+            || echo "内核 papp 下发失败" >> "$LOG"
+    else
+        # 4a. SUSFS 2.3.0：直接下发 uid 位图
+        echo "puid $(echo $UIDS)" > "$CTL" 2>>"$LOG" \
+            && echo "内核 puid 已下发: $(echo $UIDS | wc -w) 条" >> "$LOG" \
+            || echo "内核 puid 下发失败" >> "$LOG"
+    fi
 
     # 4c. sus_path 白名单：这些 uid 不受隐藏影响（默认空，按需放开）
     if [ -r /data/adb/kpm-tool/sus_allow.txt ]; then
