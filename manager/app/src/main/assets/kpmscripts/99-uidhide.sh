@@ -62,17 +62,11 @@ if [ -w "$CTL" ]; then
 fi
 
 if [ -w "$CTL" ] && [ "$MODE" != none ]; then
-    if [ "$MODE" = new ]; then
-        # 4a. SUSFS 2.4.0：按包名下发，内核自己解析 uid 并跟随重装
-        echo "papp $(echo $PKGS)" > "$CTL" 2>>"$LOG" \
-            && echo "内核 papp 已下发: $(echo $PKGS | wc -w) 个包名" >> "$LOG" \
-            || echo "内核 papp 下发失败" >> "$LOG"
-    else
-        # 4a. SUSFS 2.3.0：直接下发 uid 位图
-        echo "puid $(echo $UIDS)" > "$CTL" 2>>"$LOG" \
-            && echo "内核 puid 已下发: $(echo $UIDS | wc -w) 条" >> "$LOG" \
-            || echo "内核 puid 下发失败" >> "$LOG"
-    fi
+    # 4a. 统一走 puid（直接按 uid 填位图，确定生效）
+    #     不推荐 papp：上游解析失败时会发布空位图，把过滤清掉
+    echo "puid $(echo $UIDS)" > "$CTL" 2>>"$LOG" \
+        && echo "内核 puid 已下发: $(echo $UIDS | wc -w) 条" >> "$LOG" \
+        || echo "内核 puid 下发失败" >> "$LOG"
 
     # 4c. sus_path 白名单：这些 uid 不受隐藏影响（默认空，按需放开）
     if [ -r /data/adb/kpm-tool/sus_allow.txt ]; then
