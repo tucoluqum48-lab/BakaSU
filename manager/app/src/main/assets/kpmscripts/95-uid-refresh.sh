@@ -31,6 +31,17 @@ resolve_uids() {
     fi
 }
 
+# 探测内核支持的过滤命令（同 99-uidhide 的逻辑）
+MODE=none
+if [ -w "$CTL" ]; then
+    OUT=$(cat "$CTL" 2>/dev/null)
+    case "$OUT" in
+        *"filter:"*) MODE=new ;;
+        *"prio:"*)   MODE=old ;;
+    esac
+fi
+[ "$MODE" = none ] && exit 0
+
 LAST_MTIME=""
 while true; do
     HMA=$(ls -t /data/misc/hide_my_applist_*/config.json 2>/dev/null | head -1)
@@ -43,19 +54,27 @@ while true; do
                 | tr ',' ' ' | tr -d '"' | tr -s ' ')
             if [ -z "$PKGS" ]; then
                 # HMA 名单为空 → 清掉内核里的旧过滤，避免幽灵条目
-                if echo "puid clear" > "$CTL" 2>/dev/null; then
+                if echo "papp clear" > "$CTL" 2>/dev/null; then
                     rm -f "$STATE"
                     echo "$(date) refresh: HMA 名单为空，已清空内核过滤" >> "$LOG"
                 fi
             elif [ -n "$PKGS" ]; then
-                UIDS=$(resolve_uids "$PKGS")
-                SIG=$(echo "$UIDS" | md5sum | cut -d' ' -f1)
+                SIG=$(echo "$PKGS" | md5sum | cut -d' ' -f1)
                 OLD=$(cat "$STATE" 2>/dev/null)
 
-                if [ "$SIG" != "$OLD" ] && [ -n "$(echo $UIDS)" ]; then
-                    if echo "puid $UIDS" > "$CTL" 2>/dev/null; then
+                # SUSFS 2.4.0：按包名下发；2.3.0：按 uid 下发
+                if [ "$SIG" != "$OLD" ] && [ -n "$PKGS" ]; then
+                    if [ "$MODE" = new ]; then
+                        CMD="papp $(echo $PKGS)"
+                        CNT="$(echo $PKGS | wc -w) 个包名"
+                    else
+                        UIDS=$(resolve_uids "$PKGS")
+                        CMD="puid $(echo $UIDS)"
+                        CNT="$(echo $UIDS | wc -w) 条"
+                    fi
+                    if echo "$CMD" > "$CTL" 2>/dev/null; then
                         echo "$SIG" > "$STATE"
-                        echo "$(date) refresh: uid 变化，已重推 $(echo $UIDS | wc -w) 条" >> "$LOG"
+                        echo "$(date) refresh: 已重推 $CNT" >> "$LOG"
                     fi
                 fi
             fi
