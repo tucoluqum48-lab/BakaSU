@@ -39,17 +39,29 @@ log() { echo "$(date '+%H:%M:%S') $*" >> "$LOG"; }
 scan_and_register() {
     [ -w "$CTL" ] || { log "no $CTL, skip"; return 1; }
     n=0
+    loaded=$(cut -d' ' -f1 /proc/modules 2>/dev/null)
     for ko in $(find "$MODDIR" -name '*.ko' -type f 2>/dev/null); do
-        name=$(basename "$ko" .ko | tr '-' '_')
-        # 厂商自带同名模块不碰（避免把 zram 这类系统模块藏掉）
-        [ -f "/vendor/lib/modules/$name.ko" ] && continue
-        # 只登记此刻真在内核里的，避免把同名厂商模块误伤
-        if cut -d' ' -f1 /proc/modules 2>/dev/null | grep -qx "$name"; then
-            if echo "add $name" > "$CTL" 2>/dev/null; then
-                n=$((n+1))
-                log "registered $name"
+        base=$(basename "$ko" .ko | tr '-' '_')
+        # 逐个候选名匹配：文件名未必等于模块名
+        # 例：android16-6.12_yukizygisk.ko → 模块名 yukizygisk
+        cands="$base"
+        tail_part=$(echo "$base" | awk -F_ '{print $NF}')
+        [ "$tail_part" != "$base" ] && cands="$cands $tail_part"
+        # 反过来：已加载模块名是文件名后缀的情况（如 xxx_qpace_drv → qpace_drv）
+        for m in $loaded; do
+            case "$base" in *"$m") cands="$cands $m" ;; esac
+        done
+        for name in $cands; do
+            # 厂商自带同名模块不碰（避免把系统模块藏掉）
+            [ -f "/vendor/lib/modules/$name.ko" ] && continue
+            if echo "$loaded" | grep -qx "$name"; then
+                if echo "add $name" > "$CTL" 2>/dev/null; then
+                    n=$((n+1))
+                    log "registered $name (from $(basename $ko))"
+                fi
+                break
             fi
-        fi
+        done
     done
     log "scan done: $n new, list=$(tr '\n' ' ' < "$CTL" 2>/dev/null)"
     return 0
