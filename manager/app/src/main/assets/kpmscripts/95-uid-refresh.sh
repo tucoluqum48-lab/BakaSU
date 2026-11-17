@@ -54,7 +54,7 @@ while true; do
                 | tr ',' ' ' | tr -d '"' | tr -s ' ')
             if [ -z "$PKGS" ]; then
                 # HMA 名单为空 → 清掉内核里的旧过滤，避免幽灵条目
-                if echo "papp clear" > "$CTL" 2>/dev/null; then
+                if echo "puid clear" > "$CTL" 2>/dev/null; then
                     rm -f "$STATE"
                     echo "$(date) refresh: HMA 名单为空，已清空内核过滤" >> "$LOG"
                 fi
@@ -62,16 +62,12 @@ while true; do
                 SIG=$(echo "$PKGS" | md5sum | cut -d' ' -f1)
                 OLD=$(cat "$STATE" 2>/dev/null)
 
-                # SUSFS 2.4.0：按包名下发；2.3.0：按 uid 下发
+                # 统一走 puid（直接按 uid 填位图，确定生效）
+                # papp 会在解析失败时发布空位图，不作为主路径
                 if [ "$SIG" != "$OLD" ] && [ -n "$PKGS" ]; then
-                    if [ "$MODE" = new ]; then
-                        CMD="papp $(echo $PKGS)"
-                        CNT="$(echo $PKGS | wc -w) 个包名"
-                    else
-                        UIDS=$(resolve_uids "$PKGS")
-                        CMD="puid $(echo $UIDS)"
-                        CNT="$(echo $UIDS | wc -w) 条"
-                    fi
+                    UIDS=$(resolve_uids "$PKGS")
+                    CMD="puid $(echo $UIDS)"
+                    CNT="$(echo $UIDS | wc -w) 条"
                     if echo "$CMD" > "$CTL" 2>/dev/null; then
                         echo "$SIG" > "$STATE"
                         echo "$(date) refresh: 已重推 $CNT" >> "$LOG"
