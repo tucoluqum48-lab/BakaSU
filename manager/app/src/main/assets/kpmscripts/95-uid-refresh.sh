@@ -31,6 +31,17 @@ resolve_uids() {
     fi
 }
 
+# 单实例保护：避免被多次拉起（service.d 重复执行、手动启动等）
+REFRESH_LOCK=/data/adb/kpm-tool/.refresh.lock
+if [ -f "$REFRESH_LOCK" ]; then
+    OLD_PID=$(cat "$REFRESH_LOCK" 2>/dev/null)
+    if [ -n "$OLD_PID" ] && [ -d "/proc/$OLD_PID" ]; then
+        echo "$(date) refresh: 已有实例 $OLD_PID 在跑，退出" >> "$LOG" 2>/dev/null
+        exit 0
+    fi
+fi
+echo $$ > "$REFRESH_LOCK"
+
 # 探测内核支持的过滤命令（同 99-uidhide 的逻辑）
 MODE=none
 if [ -w "$CTL" ]; then
@@ -55,6 +66,7 @@ while true; do
             if [ -z "$PKGS" ]; then
                 # HMA 名单为空 → 清掉内核里的旧过滤，避免幽灵条目
                 if echo "puid clear" > "$CTL" 2>/dev/null; then
+                    [ "$MODE" = new ] && echo "papp clear" > "$CTL" 2>/dev/null
                     rm -f "$STATE"
                     echo "$(date) refresh: HMA 名单为空，已清空内核过滤" >> "$LOG"
                 fi
@@ -62,13 +74,13 @@ while true; do
                 SIG=$(echo "$PKGS" | md5sum | cut -d' ' -f1)
                 OLD=$(cat "$STATE" 2>/dev/null)
 
-                # 统一走 puid（直接按 uid 填位图，确定生效）
-                # papp 会在解析失败时发布空位图，不作为主路径
+                # 双发：puid 立即生效，papp 供内核侧跟随（补丁已加空位图保护）
                 if [ "$SIG" != "$OLD" ] && [ -n "$PKGS" ]; then
                     UIDS=$(resolve_uids "$PKGS")
                     CMD="puid $(echo $UIDS)"
                     CNT="$(echo $UIDS | wc -w) 条"
                     if echo "$CMD" > "$CTL" 2>/dev/null; then
+                        [ "$MODE" = new ] && echo "papp $(echo $PKGS)" > "$CTL" 2>/dev/null
                         echo "$SIG" > "$STATE"
                         echo "$(date) refresh: 已重推 $CNT" >> "$LOG"
                     fi
