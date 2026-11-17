@@ -62,11 +62,17 @@ if [ -w "$CTL" ]; then
 fi
 
 if [ -w "$CTL" ] && [ "$MODE" != none ]; then
-    # 4a. 统一走 puid（直接按 uid 填位图，确定生效）
-    #     不推荐 papp：上游解析失败时会发布空位图，把过滤清掉
+    # 4a. 双发：puid 立即生效（直接填位图），papp 供内核侧周期性跟随
+    #     补丁已加空位图保护（解析不出 uid 时不发布），papp 不会清掉 puid 的结果
     echo "puid $(echo $UIDS)" > "$CTL" 2>>"$LOG" \
         && echo "内核 puid 已下发: $(echo $UIDS | wc -w) 条" >> "$LOG" \
         || echo "内核 puid 下发失败" >> "$LOG"
+
+    if [ "$MODE" = new ]; then
+        echo "papp $(echo $PKGS)" > "$CTL" 2>>"$LOG" \
+            && echo "内核 papp 已下发: $(echo $PKGS | wc -w) 个包名（内核侧跟随）" >> "$LOG" \
+            || echo "内核 papp 下发失败（不影响 puid 已生效的过滤）" >> "$LOG"
+    fi
 
     # 4c. sus_path 白名单：这些 uid 不受隐藏影响（默认空，按需放开）
     if [ -r /data/adb/kpm-tool/sus_allow.txt ]; then
