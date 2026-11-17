@@ -48,6 +48,8 @@ class KpmRepository(private val context: android.content.Context) {
             "96-hide-ko.sh" to "/data/adb/service.d/96-hide-ko.sh",
             // uid 名单自动跟随：每 60 秒看一次 packages.list mtime，变了就重推 puid
             "95-uid-refresh.sh" to "/data/adb/service.d/95-uid-refresh.sh",
+            // 音量键救机：公共 post-fs-data.d 阶段先于所有模块执行，按住音量下 2~3 秒即禁用全部模块
+            "00-volkey-rescue.sh" to "/data/adb/post-fs-data.d/00-volkey-rescue.sh",
         )
 
         /** 模块路径：仅作为自举前的兜底 */
