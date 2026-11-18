@@ -67,9 +67,13 @@ if [ -w "$CTL" ] && [ "$MODE" != none ]; then
         && echo "内核 puid 已下发: $(echo $UIDS | wc -w) 条" >> "$LOG" \
         || echo "内核 puid 下发失败" >> "$LOG"
 
-    # 不再下发 papp：实测上游 worker 解析不出 uid（papp 后 uid 仍可见），
-    # 且若只解析出部分包名会发布"部分位图"，反而削弱过滤。
-    # 重装跟随由 95-uid-refresh.sh 的用户态 60 秒循环负责。
+    # 双发：puid 立即生效（直接填位图），papp 让内核自己周期跟随
+    #（papp 之前"无效"是我们保护逻辑的单位写错，已修：BITMAP_LEN → UID_NUM）
+    if [ "$MODE" = new ]; then
+        echo "papp $(echo $PKGS)" > "$CTL" 2>>"$LOG" \
+            && echo "内核 papp 已下发: $(echo $PKGS | wc -w) 个包名（内核侧跟随）" >> "$LOG" \
+            || echo "内核 papp 下发失败（不影响 puid 已生效的过滤）" >> "$LOG"
+    fi
 
     # 4c. sus_path 白名单：这些 uid 不受隐藏影响（默认空，按需放开）
     if [ -r /data/adb/kpm-tool/sus_allow.txt ]; then
