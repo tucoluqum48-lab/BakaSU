@@ -35,9 +35,16 @@ resolve_uids() {
 REFRESH_LOCK=/data/adb/kpm-tool/.refresh.lock
 if [ -f "$REFRESH_LOCK" ]; then
     OLD_PID=$(cat "$REFRESH_LOCK" 2>/dev/null)
-    if [ -n "$OLD_PID" ] && [ -d "/proc/$OLD_PID" ]; then
-        echo "$(date) refresh: 已有实例 $OLD_PID 在跑，退出" >> "$LOG" 2>/dev/null
-        exit 0
+    # 只判断 PID 会误判：锁文件跨重启保留，且 PID 会被复用
+    # 必须校验该进程的命令行确实是本脚本
+    if [ -n "$OLD_PID" ] && [ -r "/proc/$OLD_PID/cmdline" ]; then
+        OLD_CMD=$(tr '\0' ' ' < "/proc/$OLD_PID/cmdline" 2>/dev/null)
+        case "$OLD_CMD" in
+            *95-uid-refresh.sh*)
+                echo "$(date) refresh: 已有实例 $OLD_PID 在跑，退出" >> "$LOG" 2>/dev/null
+                exit 0
+                ;;
+        esac
     fi
 fi
 echo $$ > "$REFRESH_LOCK"
