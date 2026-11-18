@@ -80,12 +80,13 @@ while true; do
                 SIG=$(echo "$PKGS" | md5sum | cut -d' ' -f1)
                 OLD=$(cat "$STATE" 2>/dev/null)
 
-                # 只下发 puid（papp 实测无效，且部分解析会削弱过滤）
+                # 双发：puid 立即生效，papp 供内核周期跟随
                 if [ "$SIG" != "$OLD" ] && [ -n "$PKGS" ]; then
                     UIDS=$(resolve_uids "$PKGS")
                     CMD="puid $(echo $UIDS)"
                     CNT="$(echo $UIDS | wc -w) 条"
                     if echo "$CMD" > "$CTL" 2>/dev/null; then
+                        [ "$MODE" = new ] && echo "papp $(echo $PKGS)" > "$CTL" 2>/dev/null
                         echo "$SIG" > "$STATE"
                         echo "$(date) refresh: 已重推 $CNT" >> "$LOG"
                     fi
