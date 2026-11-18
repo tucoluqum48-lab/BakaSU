@@ -73,7 +73,6 @@ while true; do
             if [ -z "$PKGS" ]; then
                 # HMA 名单为空 → 清掉内核里的旧过滤，避免幽灵条目
                 if echo "puid clear" > "$CTL" 2>/dev/null; then
-                    [ "$MODE" = new ] && echo "papp clear" > "$CTL" 2>/dev/null
                     rm -f "$STATE"
                     echo "$(date) refresh: HMA 名单为空，已清空内核过滤" >> "$LOG"
                 fi
@@ -81,13 +80,12 @@ while true; do
                 SIG=$(echo "$PKGS" | md5sum | cut -d' ' -f1)
                 OLD=$(cat "$STATE" 2>/dev/null)
 
-                # 双发：puid 立即生效，papp 供内核侧跟随（补丁已加空位图保护）
+                # 只下发 puid（papp 实测无效，且部分解析会削弱过滤）
                 if [ "$SIG" != "$OLD" ] && [ -n "$PKGS" ]; then
                     UIDS=$(resolve_uids "$PKGS")
                     CMD="puid $(echo $UIDS)"
                     CNT="$(echo $UIDS | wc -w) 条"
                     if echo "$CMD" > "$CTL" 2>/dev/null; then
-                        [ "$MODE" = new ] && echo "papp $(echo $PKGS)" > "$CTL" 2>/dev/null
                         echo "$SIG" > "$STATE"
                         echo "$(date) refresh: 已重推 $CNT" >> "$LOG"
                     fi
