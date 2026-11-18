@@ -4,9 +4,15 @@
 # 数据源优先直接读 /data/system/packages.list（root 可读，约 15ms）
 # 读不到时退回 pm list packages -U（约 33ms）
 #
-# 轮询策略：每 60 秒看一次文件 mtime（约 7ms），
-#           只有变化时才做完整解析与下发（约 33ms）。
-#           → 跟随延迟 ≤60 秒，常态开销接近 0
+# 轮询策略（两层幂等）：
+#   ① 每 60 秒 stat 一次 packages.list 与 HMA config.json（约 7ms）
+#      任一 mtime 变化才继续
+#   ② 包名列表的 md5 与 uid_sig 比对，不同才重算 uid 并下发
+#   → 跟随延迟 ≤60 秒，常态开销接近 0
+#
+# 下发内容：puid（直接填位图，立即生效）+ papp（内核侧周期跟随，仅 2.4.0）
+# 单实例保护：/data/adb/kpm-tool/.refresh.lock + cmdline 校验
+#             （只判断 PID 会被复用误导：锁文件跨重启保留，PID 会撞上别的进程）
 
 CTL=/proc/oplus_mem_zone
 [ -e "$CTL" ] || CTL=/proc/susfs_hide_modules
