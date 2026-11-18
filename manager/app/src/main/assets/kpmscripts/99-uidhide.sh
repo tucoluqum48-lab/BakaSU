@@ -3,16 +3,16 @@
 #
 # 两个接收方（互相独立，谁在谁干活）：
 #   ① 内核 priority uid filter（setpriority / getpriority / ioprio_set / ioprio_get）
-#      → 写 /proc/oplus_mem_zone 的 papp 命令，不依赖任何 KPM
+#      → 写 /proc/oplus_mem_zone 的 puid 命令，不依赖任何 KPM
 #   ② UidHide.kpm（只管 getpriority）
 #      → kpatch ctl0 UidHide，模块不在就跳过
 #
 # 数据源：HMA-OSS 黑名单（唯一的真相来源，改 HMA 即可）
 # 由 dsh 生成，2026-11-16  v8（包名驱动 + 白名单）
 #   v8 新增：
-#     · papp  <包名...>  内核按包名解析 uid，重装 app 自动跟随（60s 重算）
+#     · papp  <包名...>  保留但未使用（上游 worker 解析不出 uid，实测无效）
 #     · sallow <包名...> 白名单（2.4.0 按包名），名单内 app 不受 strict 位隐藏影响
-#   v9：内核升级到 SUSFS 2.4.0 后只下发 papp（上游按包名解析 uid）
+#   v10：只下发 puid（直接填位图）；papp 实测无效，已停用
 KP=/data/adb/kpm-tool/bin/kpatch
 CTL=/proc/oplus_mem_zone
 [ -e "$CTL" ] || CTL=/proc/susfs_hide_modules
@@ -62,17 +62,14 @@ if [ -w "$CTL" ]; then
 fi
 
 if [ -w "$CTL" ] && [ "$MODE" != none ]; then
-    # 4a. 双发：puid 立即生效（直接填位图），papp 供内核侧周期性跟随
-    #     补丁已加空位图保护（解析不出 uid 时不发布），papp 不会清掉 puid 的结果
+    # 4a. 只下发 puid（直接按 uid 填位图，确定生效）
     echo "puid $(echo $UIDS)" > "$CTL" 2>>"$LOG" \
         && echo "内核 puid 已下发: $(echo $UIDS | wc -w) 条" >> "$LOG" \
         || echo "内核 puid 下发失败" >> "$LOG"
 
-    if [ "$MODE" = new ]; then
-        echo "papp $(echo $PKGS)" > "$CTL" 2>>"$LOG" \
-            && echo "内核 papp 已下发: $(echo $PKGS | wc -w) 个包名（内核侧跟随）" >> "$LOG" \
-            || echo "内核 papp 下发失败（不影响 puid 已生效的过滤）" >> "$LOG"
-    fi
+    # 不再下发 papp：实测上游 worker 解析不出 uid（papp 后 uid 仍可见），
+    # 且若只解析出部分包名会发布"部分位图"，反而削弱过滤。
+    # 重装跟随由 95-uid-refresh.sh 的用户态 60 秒循环负责。
 
     # 4c. sus_path 白名单：这些 uid 不受隐藏影响（默认空，按需放开）
     if [ -r /data/adb/kpm-tool/sus_allow.txt ]; then
