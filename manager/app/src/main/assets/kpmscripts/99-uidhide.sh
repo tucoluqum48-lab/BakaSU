@@ -8,11 +8,14 @@
 #      → kpatch ctl0 UidHide，模块不在就跳过
 #
 # 数据源：HMA-OSS 黑名单（唯一的真相来源，改 HMA 即可）
-# 由 dsh 生成，2026-11-16  v8（包名驱动 + 白名单）
-#   v8 新增：
-#     · papp  <包名...>  保留但未使用（上游 worker 解析不出 uid，实测无效）
-#     · sallow <包名...> 白名单（2.4.0 按包名），名单内 app 不受 strict 位隐藏影响
-#   v10：只下发 puid（直接填位图）；papp 实测无效，已停用
+# 由 dsh 生成，当前 v11
+#   v8  ：包名驱动 + 白名单
+#   v10 ：曾只发 puid —— 当时误判 papp 无效（真实原因是我们保护逻辑的
+#         bitmap_empty 单位写错：传了 BITMAP_LEN(157) 而非 UID_NUM(10000)）
+#   v11 ：恢复 puid + papp 双发
+#         · puid <uid...>   直接按 uid 填位图，立即生效
+#         · papp <包名...>  内核解析包名，自己周期跟随（补丁已修好）
+#         · sallow <包名...> 白名单（2.4.0 按包名），名单内 app 不受 strict 位影响
 KP=/data/adb/kpm-tool/bin/kpatch
 CTL=/proc/oplus_mem_zone
 [ -e "$CTL" ] || CTL=/proc/susfs_hide_modules
