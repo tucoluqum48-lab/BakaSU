@@ -98,6 +98,82 @@ jobs:
           find fina/manager/app/build/outputs -name '*.apk' -exec cp {} out/ \;
           ls -lh out
 
+      - name: 下载官方 ksud（v1.6.4 release 的 kernel-bundle）
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -e
+          URL="https://github.com/LyraVoid/FinaSU/releases/download/v1.6.4/FinaSU_v1.6.4_kernel-bundle.zip"
+          curl -L --retry 3 -m 600 -o /tmp/kb.zip "$URL"
+          ls -lh /tmp/kb.zip
+          rm -rf /tmp/kb && mkdir -p /tmp/kb && unzip -q /tmp/kb.zip -d /tmp/kb
+          echo "--- bundle 里的 ksud 相关文件 ---"
+          find /tmp/kb -iname '*ksud*' -maxdepth 4 | head -10
+          KSUD_ARM=$(find /tmp/kb -type f -name 'ksud' | grep -i 'arm64\|aarch64' | head -1)
+          [ -n "$KSUD_ARM" ] || KSUD_ARM=$(find /tmp/kb -type f -name 'ksud' | head -1)
+          [ -n "$KSUD_ARM" ] || { echo "bundle 里找不到 ksud"; exit 1; }
+          echo "选用: $KSUD_ARM ($(stat -c %s "$KSUD_ARM") 字节)"
+          mkdir -p fina/target/aarch64-linux-android/release
+          cp -f "$KSUD_ARM" fina/target/aarch64-linux-android/release/ksud
+          chmod +x fina/target/aarch64-linux-android/release/ksud
+          echo "ksud-aarch64-linux-android=$(stat -c %s fina/target/aarch64-linux-android/release/ksud)" >> $GITHUB_OUTPUT
+
+      - name: 注入 libksud.so 并重签（repack_apk.py）
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -e
+          cp "$RUNNER_TEMP/key.jks" fina/key.jks
+          cd fina
+          echo "--- repack 前 APK ---"
+          find manager/app/build/outputs -name '*.apk' -exec ls -lh {} \;
+          python3 repack_apk.py repack \
+            -a arm64-v8a \
+            -K "$PWD/key.jks" \
+            -A "$KEY_ALIAS" \
+            -P "$KEYSTORE_PASSWORD" \
+            -S "$KEY_PASSWORD" \
+            --no-strip \
+            -o "$PWD/../out" 2>&1 | tail -30
+          echo "--- repack 后 ---"
+          ls -lh "$PWD/../out" || true
+
+      - name: 校验最终 APK（签名与 libksud）
+        run: |
+          APK=$(find out -name '*.apk' | head -1)
+          echo "APK: $APK ($(stat -c %s "$APK") 字节)"
+          unzip -l "$APK" | grep -E 'libksud|lib/(arm64|x86_64|riscv64)' | head -10
+          python3 - "$APK" <<'PYCHK'
+          import struct, hashlib, sys
+          data = open(sys.argv[1], 'rb').read()
+          eocd = data.rfind(b'PK\x05\x06')
+          cd_off = struct.unpack('<I', data[eocd+16:eocd+20])[0]
+          size_footer = struct.unpack('<Q', data[cd_off-24:cd_off-16])[0]
+          blk = data[cd_off-size_footer-8:cd_off]
+          def lp(b, o):
+              n = struct.unpack('<I', b[o:o+4])[0]
+              return b[o+4:o+4+n], o+4+n
+          pos = 8
+          while pos < len(blk) - 24:
+              ln = struct.unpack('<Q', blk[pos:pos+8])[0]
+              pid = struct.unpack('<I', blk[pos+8:pos+12])[0]
+              if pid == 0x7109871a:
+                  v = blk[pos+12:pos+8+ln]
+                  signers, _ = lp(v, 0)
+                  signer, _ = lp(signers, 0)
+                  signed, _ = lp(signer, 0)
+                  _, o2 = lp(signed, 0)
+                  certs, _ = lp(signed, o2)
+                  cert, _ = lp(certs, 0)
+                  print('cert size =', len(cert), 'hash =', hashlib.sha256(cert).hexdigest())
+                  break
+              pos += 8 + ln
+          PYCHK
+
       - name: 上传 APK
         uses: actions/upload-artifact@v4
         with:
