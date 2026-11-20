@@ -90,11 +90,22 @@ jobs:
           cp "$RUNNER_TEMP/key.jks" fina/manager/key.jks 2>/dev/null || true
           cd fina/manager
           chmod +x gradlew
-          ./gradlew :app:assembleRelease --no-daemon --stacktrace \
+          set +e
+          ./gradlew :app:assembleRelease --no-daemon \
             -PKEYSTORE_FILE=key.jks \
             -PKEYSTORE_PASSWORD="$KEYSTORE_PASSWORD" \
             -PKEY_ALIAS="$KEY_ALIAS" \
-            -PKEY_PASSWORD="$KEY_PASSWORD" 2>&1 | tail -80
+            -PKEY_PASSWORD="$KEY_PASSWORD" > /tmp/gradle.log 2>&1
+          RC=$?
+          echo "gradle 退出码: $RC"
+          if [ $RC -ne 0 ]; then
+            echo "=== Kotlin/编译错误 ==="
+            grep -E '^e: |^w: .*KpmBridge|error:|Unresolved|BUILD FAILED' /tmp/gradle.log | head -40
+            echo "=== 末尾日志 ==="
+            tail -25 /tmp/gradle.log
+            exit 1
+          fi
+          tail -5 /tmp/gradle.log
 
       - name: 检查 gradle 产物
         run: |
