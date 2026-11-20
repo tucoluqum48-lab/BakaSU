@@ -6,7 +6,7 @@ on:
       finasu_ref:
         description: 'FinaSU 分支/标签'
         required: true
-        default: 'dev'
+        default: 'master'
       api_token:
         description: '在线商店 api.token（留空则用默认提取值）'
         required: false
@@ -23,7 +23,7 @@ jobs:
 
       - name: 克隆 FinaSU 源码
         run: |
-          git clone --filter=blob:none https://github.com/LyraVoid/FinaSU.git fina
+          git clone --filter=blob:none https://github.com/tucoluqum48-lab/FinaSU.git fina
           cd fina
           git checkout "${{ github.event.inputs.finasu_ref }}"
           git fetch --tags --force --quiet || true
