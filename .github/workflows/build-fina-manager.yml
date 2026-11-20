@@ -1,0 +1,96 @@
+name: Build FinaSU Manager (custom)
+
+on:
+  workflow_dispatch:
+    inputs:
+      finasu_ref:
+        description: 'FinaSU 分支/标签'
+        required: true
+        default: 'dev'
+      api_token:
+        description: '在线商店 api.token（留空则用默认提取值）'
+        required: false
+        default: ''
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出当前仓库（用于读取 secrets 与上传）
+        uses: actions/checkout@v4
+        with:
+          path: self
+
+      - name: 克隆 FinaSU 源码
+        run: |
+          git clone --filter=blob:none https://github.com/LyraVoid/FinaSU.git fina
+          cd fina
+          git checkout "${{ github.event.inputs.finasu_ref }}"
+          git fetch --tags --force --quiet || true
+          echo "commit=$(git rev-parse --short HEAD) count=$(git rev-list --count HEAD) describe=$(git describe --tags --always)"
+
+      - name: 准备签名与 auth.properties
+        id: auth
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          API_TOKEN_IN: ${{ github.event.inputs.api_token }}
+        run: |
+          set -e
+          echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/key.jks"
+          FP=$(keytool -list -v -keystore "$RUNNER_TEMP/key.jks" -alias "$KEY_ALIAS" \
+                 -storepass "$KEYSTORE_PASSWORD" 2>/dev/null | grep -m1 'SHA256:' | sed 's/.*SHA256: //')
+          HASH=$(echo "$FP" | tr -d ':' | tr 'A-F' 'a-f')
+          echo "证书 SHA-256: $HASH"
+          [ -n "$HASH" ] || { echo "取证书指纹失败"; exit 1; }
+          TOKEN="$API_TOKEN_IN"
+          [ -n "$TOKEN" ] || TOKEN='VkSbJok1qA6HXYDbWjEuexRNmCjk20NK'
+          cat > fina/manager/auth.properties <<EOF
+          api.token=$TOKEN
+          app.signature.hash=$HASH
+          EOF
+          cat fina/manager/auth.properties
+          echo "hash=$HASH" >> $GITHUB_OUTPUT
+
+      - name: 安装 JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: 安装 Android SDK 组件
+        run: |
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install \
+            "platform-tools" "platforms;android-37" "build-tools;37.0.0" >/dev/null
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --list_installed | head -20
+
+      - name: 构建 manager
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          cp "$RUNNER_TEMP/key.jks" fina/manager/key.jks 2>/dev/null || true
+          cd fina/manager
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace \
+            -PKEYSTORE_FILE=key.jks \
+            -PKEYSTORE_PASSWORD="$KEYSTORE_PASSWORD" \
+            -PKEY_ALIAS="$KEY_ALIAS" \
+            -PKEY_PASSWORD="$KEY_PASSWORD" 2>&1 | tail -80
+
+      - name: 收集产物
+        run: |
+          find fina/manager/app/build/outputs -name '*.apk' -exec ls -lh {} \;
+          mkdir -p out
+          find fina/manager/app/build/outputs -name '*.apk' -exec cp {} out/ \;
+          ls -lh out
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: FinaSU-Manager-custom
+          path: out/*.apk
