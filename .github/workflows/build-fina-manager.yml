@@ -118,17 +118,19 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -e
-          URL="https://github.com/LyraVoid/FinaSU/releases/download/v1.6.4/FinaSU_v1.6.4_kernel-bundle.zip"
-          curl -L --retry 3 -m 600 -o /tmp/kb.zip "$URL"
-          ls -lh /tmp/kb.zip
-          rm -rf /tmp/kb && mkdir -p /tmp/kb && unzip -q /tmp/kb.zip -d /tmp/kb
+          # 官方 APK 里的 libksud.so 才是与管理器配套的 ksud（支持 plugin 等子命令）；
+          # kernel-bundle.zip 里那份较旧，会让"插件"等页面报 unrecognized subcommand
+          URL="https://github.com/LyraVoid/FinaSU/releases/download/v1.6.4/FinaSU_v1.6.4_33211-release.apk"
+          curl -L --retry 3 -m 600 -o /tmp/kb.apk "$URL"
+          ls -lh /tmp/kb.apk
+          rm -rf /tmp/kb && mkdir -p /tmp/kb && unzip -q /tmp/kb.apk 'lib/*' -d /tmp/kb
           echo "--- bundle 里的 ksud 相关文件 ---"
           find /tmp/kb -iname '*ksud*' -maxdepth 4 | head -10
           echo "--- 完整文件清单（前 20）---"
           find /tmp/kb -type f | head -20
           # bundle 里可能是 ksud/android-arm64 这类结构，也可能直接是 ksud
-          KSUD_ARM=$(find /tmp/kb -type f | grep -i ksud | grep -Ei 'arm64|aarch64' | head -1)
-          [ -n "$KSUD_ARM" ] || KSUD_ARM=$(find /tmp/kb -type f -name 'ksud*' -size +1M | head -1)
+          KSUD_ARM=$(find /tmp/kb -type f -name "libksud.so" | grep -i arm64 | head -1)
+          [ -n "$KSUD_ARM" ] || KSUD_ARM=$(find /tmp/kb -type f -name "libksud.so" | head -1)
           [ -n "$KSUD_ARM" ] || KSUD_ARM=$(find /tmp/kb -type f | grep -i ksud | head -1)
           [ -n "$KSUD_ARM" ] || { echo "bundle 里找不到 ksud"; exit 1; }
           echo "选用: $KSUD_ARM ($(stat -c %s "$KSUD_ARM") 字节)"
