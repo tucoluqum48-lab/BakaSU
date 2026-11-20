@@ -27,6 +27,11 @@ jobs:
           cd fina
           git checkout "${{ github.event.inputs.finasu_ref }}"
           git fetch --tags --force --quiet || true
+          # 版本号来自 git describe --tags；fork 若没有 tag 就会退化成提交号
+          echo "tag 数: $(git tag | wc -l)  最新: $(git describe --tags --always 2>/dev/null)"
+          if [ "$(git describe --tags --always)" = "$(git rev-parse --short HEAD)" ]; then
+            echo "!! 没有可用 tag，版本号会显示成提交哈希"
+          fi
           echo "commit=$(git rev-parse --short HEAD) count=$(git rev-list --count HEAD) describe=$(git describe --tags --always)"
 
       - name: 准备签名与 auth.properties
