@@ -1,4 +1,4 @@
-name: Build FinaSU Manager (custom)
+name: Build DeepseekSU Manager (custom)
 
 on:
   workflow_dispatch:
