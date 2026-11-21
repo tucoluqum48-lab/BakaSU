@@ -11,6 +11,10 @@ on:
         description: '在线商店 api.token（留空则用默认提取值）'
         required: false
         default: ''
+      manager_package:
+        description: '管理器包名（applicationId，留空用默认 me.yuki.fina）'
+        required: false
+        default: 'ly.deepseek.dsh'
 
 jobs:
   build:
@@ -90,8 +94,14 @@ jobs:
           cp "$RUNNER_TEMP/key.jks" fina/manager/key.jks 2>/dev/null || true
           cd fina/manager
           chmod +x gradlew
+          PKG_ARG=""
+          if [ -n "${{ github.event.inputs.manager_package }}" ]; then
+            PKG_ARG="-PKSU_PACKAGE_NAME=${{ github.event.inputs.manager_package }}"
+            echo "管理器包名: ${{ github.event.inputs.manager_package }}"
+          fi
           set +e
           ./gradlew :app:assembleRelease --no-daemon \
+            ${PKG_ARG} \
             -PKEYSTORE_FILE=key.jks \
             -PKEYSTORE_PASSWORD="$KEYSTORE_PASSWORD" \
             -PKEY_ALIAS="$KEY_ALIAS" \
