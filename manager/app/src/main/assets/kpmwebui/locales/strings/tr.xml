@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- UI Labels -->
+    <string name="title_patch">Yama</string>
+    <string name="title_unpatch">Yamayı Kaldır</string>
+    <string name="title_kpmodule">KPModül</string>
+    <string name="title_exclude">Hariç Tut</string>
+    <string name="title_settings">Ayarlar</string>
+    <string name="title_home">Ana Sayfa</string>
+    <string name="title_language">Dil</string>
+    <string name="title_control_kpmodule">KPModül'ü Kontrol Et</string>
+    <string name="title_select_language">Dil Seç</string>
+    <string name="title_reboot">Yeniden Başlat</string>
+    <string name="title_reboot_recovery">Kurtarma Modunda Yeniden Başlat</string>
+    <string name="title_reboot_bootloader">Önyükleyicide Yeniden Başlat</string>
+    <string name="title_reboot_download">İndirme Modunda Yeniden Başlat</string>
+    <string name="title_reboot_edl">EDL Modunda Yeniden Başlat</string>
+    <string name="title_kernel">Çekirdek</string>
+    <string name="title_rehook_syscall">Yeniden Kancala Syscall</string>
+    <!-- Buttons -->
+    <string name="button_install">Yüklemek için tıkla</string>
+    <string name="button_uninstall">Kaldır</string>
+    <string name="button_embed_kpm">KPM'yi Gömülü Yap</string>
+    <string name="button_start">Başlat</string>
+    <string name="button_unpatch">Yamayı Kaldır</string>
+    <string name="button_cancel">İptal Et</string>
+    <string name="button_ok">Tamam</string>
+    <string name="button_load">Yükle</string>
+    <string name="button_unload">Kaldır</string>
+    <string name="button_refresh">Yenile</string>
+    <!-- Labels -->
+    <string name="label_input_control_parameters">Kontrol parametrelerini gir:</string>
+    <string name="label_parameters">Parametreler</string>
+    <string name="label_load_temporarily">Geçici olarak yükle</string>
+    <string name="label_show_system_app">Sistem uygulamasını göster</string>
+    <string name="label_system_default">Sistem Varsayılanı</string>
+    <string name="label_trigger_event">Olay Tetikle</string>
+    <!-- Status -->
+    <string name="status_not_installed">Kurulu Değil</string>
+    <string name="status_working">Çalışıyor 😋</string>
+    <string name="status_loading">Yükleniyor...</string>
+    <!-- Info -->
+    <string name="info_kernel_version">Çekirdek sürümü</string>
+    <string name="info_system_version">Sistem sürümü</string>
+    <string name="info_fingerprint">Parmak izi</string>
+    <string name="info_selinux_status">SELinux durumu</string>
+    <string name="info_version">Sürüm: %1$s</string>
+    <string name="info_time">Zaman: %1$s</string>
+    <string name="info_config">Yapılandırma: %1$s</string>
+    <string name="info_slot">Yuva: %1$s</string>
+    <string name="info_device">Cihaz: %1$s</string>
+    <string name="info_device_unknown">Cihaz: Bilinmiyor</string>
+    <string name="info_author">Yazar: %1$s</string>
+    <string name="info_args">Değişkenler: %1$s</string>
+    <string name="info_no_description">Açıklama yok</string>
+    <string name="info_embedded">GÖMÜLÜ</string>
+    <string name="info_user">KULLANICI %1$s</string>
+    <string name="info_system">SİSTEM</string>
+    <!-- Messages -->
+    <string name="msg_no_module_loaded">Hiçbir modül yüklenmedi</string>
+    <string name="msg_no_app_found">Uygulama bulunamadı</string>
+    <string name="msg_no_module_found">Modül bulunamadı</string>
+    <string name="msg_module_loaded">%1$s yüklenecek.</string>
+    <string name="msg_unload_module">%1$s modülü kaldırılsın mı?</string>
+    <string name="msg_redirecting_to">%1$s adresine yönlendiriliyor</string>
+    <string name="msg_failed_open_link">Bağlantı exec ile açılamadı</string>
+    <string name="msg_failed_parse_kernel">Çekirdek ayrıştırılamadı:</string>
+    <string name="msg_boot_extract_failed">Boot ayıklama işlemi başarısız oldu</string>
+    <string name="msg_failed_locate_boot">Boot imajı bulunamadı</string>
+    <string name="msg_invalid_kpm_file">Geçersiz KPM dosyası</string>
+    <string name="msg_could_not_parse_kpm">KPM bilgileri ayrıştırılamadı</string>
+    <string name="msg_error_no_boot_image">Hata: Hiçbir Boot imajı bulunamadı.</string>
+    <string name="msg_please_select_file">Lütfen bir %1$s dosyası seçin</string>
+    <string name="msg_please_wait">Lütfen bekleyin...</string>
+    <string name="msg_uploading">Yükleniyor... </string>
+    <string name="msg_upload_cancelled">Yükleme iptal edildi</string>
+    <string name="msg_error">Hata: %1$s</string>
+    <string name="msg_successfully_loaded">%1$s başarıyla yüklendi</string>
+    <string name="msg_failed_load_module">%1$s modülü yüklenemedi</string>
+    <string name="msg_failed_get_module_info">Modül bilgileri alınamadı</string>
+    <string name="msg_error_loading_apps">Uygulamalar yüklenirken hata oluştu: </string>
+    <string name="msg_error_rendering_apps">Uygulamalar oluşturulurken hata oluştu: </string>
+    <string name="msg_unknown">Bilinmiyor</string>
+</resources>

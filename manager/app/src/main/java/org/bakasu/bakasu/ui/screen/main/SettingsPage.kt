@@ -559,6 +559,48 @@ fun SettingsPage(bottomPadding: Dp) {
                 }
             }
 
+            // KPM 模块（KPatch-Next）
+            item {
+                SegmentedColumn(
+                    title = "KPM 模块",
+                    content = {
+                        item {
+                            SettingsJumpPageWidget(
+                                icon = Icons.TwoTone.Extension,
+                                title = "KPM 模块管理",
+                                onClick = {
+                                    // 直接打开内置的原版 KPM 界面（WebUI），不再进 Compose 页
+                                    scope.launch {
+                                        runCatching {
+                                            val kpmRepo =
+                                                org.bakasu.bakasu.data.kpm.KpmRepository(context.applicationContext)
+                                            // 自愈：补齐工具链（kpatch/kpimg/kptools/magiskboot）并重写开机脚本
+                                            runCatching { kpmRepo.bootstrap() }
+                                            kpmRepo.ensureWebUiModule()
+                                            context.startActivity(
+                                                Intent(
+                                                    context,
+                                                    org.bakasu.bakasu.ui.webui.WebUIActivity::class.java,
+                                                ).setData(
+                                                    Uri.Builder()
+                                                        .scheme("kernelsu")
+                                                        .authority("webui")
+                                                        .appendQueryParameter(
+                                                            "id",
+                                                            org.bakasu.bakasu.ui.webui.BuiltinWebUI.MODULE_ID,
+                                                        )
+                                                        .build(),
+                                                ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                            )
+                                        }
+                                    }
+                                },
+                            )
+                        }
+                    },
+                )
+            }
+
             // 关于卡片
             item {
                 SegmentedColumn(

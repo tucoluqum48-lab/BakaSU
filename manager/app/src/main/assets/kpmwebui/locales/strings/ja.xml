@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- UI Labels -->
+    <string name="title_patch">パッチ</string>
+    <string name="title_unpatch">パッチ解除</string>
+    <string name="title_kpmodule">KPModule</string>
+    <string name="title_exclude">除外</string>
+    <string name="title_settings">設定</string>
+    <string name="title_home">ホーム</string>
+    <string name="title_language">言語</string>
+    <string name="title_control_kpmodule">KPModule を制御</string>
+    <string name="title_select_language">言語を選択</string>
+    <string name="title_reboot">再起動</string>
+    <string name="title_reboot_recovery">Recovery へ再起動</string>
+    <string name="title_reboot_bootloader">Bootloader へ再起動</string>
+    <string name="title_reboot_download">ダウンロードモードへ再起動</string>
+    <string name="title_reboot_edl">EDL へ再起動</string>
+    <string name="title_kernel">カーネル</string>
+    <string name="title_rehook_syscall">再フック Syscall</string>
+    <!-- Buttons -->
+    <string name="button_install">クリックしてインストール</string>
+    <string name="button_uninstall">アンインストール</string>
+    <string name="button_embed_kpm">KPM を埋め込む</string>
+    <string name="button_start">開始</string>
+    <string name="button_unpatch">パッチ解除</string>
+    <string name="button_cancel">キャンセル</string>
+    <string name="button_ok">OK</string>
+    <string name="button_load">ロード</string>
+    <string name="button_unload">アンロード</string>
+    <string name="button_refresh">更新</string>
+    <!-- Labels -->
+    <string name="label_input_control_parameters">制御パラメータを入力:</string>
+    <string name="label_parameters">パラメータ</string>
+    <string name="label_load_temporarily">一時的にロード</string>
+    <string name="label_show_system_app">システムアプリを表示</string>
+    <string name="label_system_default">システムのデフォルト</string>
+    <string name="label_trigger_event">トリガーイベント</string>
+    <!-- Status -->
+    <string name="status_not_installed">未インストール</string>
+    <string name="status_working">動作中 😋</string>
+    <string name="status_loading">読み込み中...</string>
+    <!-- Info -->
+    <string name="info_kernel_version">カーネルバージョン</string>
+    <string name="info_system_version">システムバージョン</string>
+    <string name="info_fingerprint">Fingerprint</string>
+    <string name="info_selinux_status">SELinux の状態</string>
+    <string name="info_version">バージョン: %1$s</string>
+    <string name="info_time">時刻: %1$s</string>
+    <string name="info_config">設定: %1$s</string>
+    <string name="info_slot">スロット: %1$s</string>
+    <string name="info_device">デバイス: %1$s</string>
+    <string name="info_device_unknown">デバイス: 不明</string>
+    <string name="info_author">作成者: %1$s</string>
+    <string name="info_args">引数: %1$s</string>
+    <string name="info_no_description">説明がありません</string>
+    <string name="info_embedded">埋め込み</string>
+    <string name="info_user">ユーザー %1$s</string>
+    <string name="info_system">システム</string>
+    <!-- Messages -->
+    <string name="msg_no_module_loaded">モジュールがロードされていません</string>
+    <string name="msg_no_app_found">アプリが見つかりません</string>
+    <string name="msg_no_module_found">モジュールが見つかりません</string>
+    <string name="msg_module_loaded">%1$s がロードされます。</string>
+    <string name="msg_unload_module">%1$s モジュールをアンロードしますか?</string>
+    <string name="msg_redirecting_to">%1$s にリダイレクトしています</string>
+    <string name="msg_failed_open_link">実行時にリンクを開けませんでした</string>
+    <string name="msg_failed_parse_kernel">カーネルの解析に失敗しました:</string>
+    <string name="msg_boot_extract_failed">Boot 抽出に失敗しました</string>
+    <string name="msg_failed_locate_boot">Boot イメージが見つかりませんでした</string>
+    <string name="msg_invalid_kpm_file">無効な KPM ファイル</string>
+    <string name="msg_could_not_parse_kpm">KPM 情報を解析できませんでした</string>
+    <string name="msg_error_no_boot_image">エラー: Boot イメージが見つかりません。</string>
+    <string name="msg_please_select_file">%1$s ファイルを選択してください</string>
+    <string name="msg_please_wait">お待ちください...</string>
+    <string name="msg_uploading">アップロード中...</string>
+    <string name="msg_upload_cancelled">アップロードがキャンセルされました</string>
+    <string name="msg_error">エラー: %1$s</string>
+    <string name="msg_successfully_loaded">%1$s のロードに成功しました</string>
+    <string name="msg_failed_load_module">モジュール %1$s のロードに失敗しました</string>
+    <string name="msg_failed_get_module_info">モジュール情報を取得できませんでした</string>
+    <string name="msg_error_loading_apps">アプリの読み込みエラー: </string>
+    <string name="msg_error_rendering_apps">アプリのレンダリングエラー: </string>
+    <string name="msg_unknown">不明</string>
+</resources>

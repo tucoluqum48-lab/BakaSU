@@ -64,7 +64,11 @@ internal suspend fun prepareWebView(
     colorsCssProvider: () -> String,
 ) {
     withContext(Dispatchers.IO) {
-        val moduleInfo = try {
+        // 内置界面（KPM）：命中时跳过模块查询，直接使用 app 私有目录
+        val builtinRoot = BuiltinWebUI.rootFor(moduleId)
+        val moduleInfo = if (builtinRoot != null) {
+            null
+        } else try {
             webUiRepository.getModuleInfo(moduleId)
         } catch (error: Exception) {
             if (error is CancellationException) throw error
@@ -76,14 +80,14 @@ internal suspend fun prepareWebView(
             return@withContext
         }
 
-        if (moduleInfo == null) {
+        if (builtinRoot == null && moduleInfo == null) {
             withContext(Dispatchers.Main) {
                 webUIState.uiEvent = WebUIEvent.Error(activity.getString(R.string.no_such_module, moduleId))
             }
             return@withContext
         }
 
-        if (!moduleInfo.hasWebUi || !moduleInfo.enabled || moduleInfo.remove) {
+        if (builtinRoot == null && (!moduleInfo!!.hasWebUi || !moduleInfo.enabled || moduleInfo.remove)) {
             withContext(Dispatchers.Main) {
                 webUIState.uiEvent = WebUIEvent.Error(activity.getString(R.string.module_unavailable, moduleInfo.name))
             }
@@ -94,15 +98,16 @@ internal suspend fun prepareWebView(
             superUserViewModel.dispatch(SuperUserUiAction.Refresh)
         }
         withContext(Dispatchers.Main) {
-            webUIState.moduleName = moduleInfo.name
-            webUIState.modDir = "/data/adb/modules/$moduleId"
+            val displayName = builtinRoot?.let { BuiltinWebUI.info().name } ?: moduleInfo!!.name
+            webUIState.moduleName = displayName
+            webUIState.modDir = builtinRoot?.absolutePath ?: "/data/adb/modules/$moduleId"
 
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
                 @Suppress("DEPRECATION")
-                activity.setTaskDescription(ActivityManager.TaskDescription("KernelSU - ${moduleInfo.name}"))
+                activity.setTaskDescription(ActivityManager.TaskDescription("KernelSU - $displayName"))
             } else {
                 val taskDescription = ActivityManager.TaskDescription.Builder()
-                    .setLabel("KernelSU - ${moduleInfo.name}")
+                    .setLabel("KernelSU - $displayName")
                     .build()
                 activity.setTaskDescription(taskDescription)
             }
@@ -121,18 +126,22 @@ internal suspend fun prepareWebView(
             }
 
             val webRoot = File("${webUIState.modDir}/webroot")
+            // 内置界面用系统自带的 InternalStoragePathHandler（只要求目录在 app 私有存储内，
+            // 不做 /data/data 黑名单校验）；模块界面仍走 SuFilePathHandler（需 root shell 读 /data/adb）
+            val pathHandler: WebViewAssetLoader.PathHandler = if (builtinRoot != null) {
+                WebViewAssetLoader.InternalStoragePathHandler(activity, webRoot)
+            } else {
+                SuFilePathHandler(
+                    webRoot,
+                    webUiRepository,
+                    { webUIState.currentInsets },
+                    { enable -> webUIState.isInsetsEnabled = enable },
+                    colorsCssProvider,
+                )
+            }
             val webViewAssetLoader = WebViewAssetLoader.Builder()
                 .setDomain(WEB_DOMAIN)
-                .addPathHandler(
-                    "/",
-                    SuFilePathHandler(
-                        webRoot,
-                        webUiRepository,
-                        { webUIState.currentInsets },
-                        { enable -> webUIState.isInsetsEnabled = enable },
-                        colorsCssProvider,
-                    ),
-                )
+                .addPathHandler("/", pathHandler)
                 .build()
 
             // WebViewClient
