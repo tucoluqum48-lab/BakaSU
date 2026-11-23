@@ -1,0 +1,75 @@
+name: 重签外部 APK（用管理器密钥）
+
+on:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: '要重签的 APK 下载地址'
+        required: true
+        default: 'https://github.com/LyraVoid/FinaSU/releases/download/v1.6.4/FinaSU_v1.6.4_33211-release.apk'
+      outname:
+        description: '输出文件名（不含 .apk）'
+        required: true
+        default: 'FinaSU_resigned'
+
+jobs:
+  resign:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: 下载原包
+        run: |
+          mkdir -p work && cd work
+          curl -L --retry 3 -o in.apk "${{ github.event.inputs.url }}"
+          ls -lh in.apk
+
+      - name: 去掉 v1 签名文件
+        run: |
+          cd work
+          cp in.apk unsigned.apk
+          # 内核要求：不能存在 META-INF/MANIFEST.MF 等 v1 签名文件
+          zip -d unsigned.apk "META-INF/*.SF" "META-INF/*.RSA" "META-INF/*.DSA" "META-INF/*.EC" "META-INF/MANIFEST.MF" || true
+          echo "--- 残留 META-INF ---"
+          unzip -l unsigned.apk | grep -i 'META-INF' | head -10 || true
+
+      - name: 写入密钥
+        run: |
+          cd work
+          if [ -z "${{ secrets.KEYSTORE }}" ]; then
+            echo "缺少 KEYSTORE 密钥，无法重签"; exit 1
+          fi
+          echo "${{ secrets.KEYSTORE }}" | base64 -d > key.jks
+          echo "keystore 大小: $(stat -c %s key.jks) B"
+
+      - name: 重签（关闭 v1，保留 v2/v3）
+        run: |
+          cd work
+          BT=$(ls $ANDROID_HOME/build-tools | sort -V | tail -1)
+          echo "build-tools: $BT"
+          $ANDROID_HOME/build-tools/$BT/zipalign -p -f 4 unsigned.apk aligned.apk
+          $ANDROID_HOME/build-tools/$BT/apksigner sign \
+            --ks key.jks \
+            --ks-pass "pass:${{ secrets.KEYSTORE_PASSWORD }}" \
+            --key-pass "pass:${{ secrets.KEY_PASSWORD }}" \
+            --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
+            --v1-signing-enabled false \
+            --v2-signing-enabled true \
+            --v3-signing-enabled true \
+            --out "${{ github.event.inputs.outname }}.apk" aligned.apk
+          ls -lh "${{ github.event.inputs.outname }}.apk"
+
+      - name: 校验签名
+        run: |
+          cd work
+          BT=$(ls $ANDROID_HOME/build-tools | sort -V | tail -1)
+          $ANDROID_HOME/build-tools/$BT/apksigner verify --print-certs "${{ github.event.inputs.outname }}.apk" | head -6
+          echo "--- 期望 SHA-256 ---"
+          echo "77969000a4789181b19bf0cdd5ef24b2ecf731e17082e439e4d1e75f1bad673d"
+          echo "--- 确认没有 v1 ---"
+          unzip -l "${{ github.event.inputs.outname }}.apk" | grep -i 'MANIFEST.MF' && exit 1 || echo "无 v1 签名文件 ✓"
+
+      - name: 上传
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ github.event.inputs.outname }}
+          path: work/${{ github.event.inputs.outname }}.apk
+          retention-days: 7
