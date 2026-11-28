@@ -121,7 +121,7 @@ jobs:
         run: |
           find fina/manager/app/build/outputs -name '*.apk' -exec ls -lh {} \;
 
-      - name: 下载官方 ksud（v1.7.0 release 的 APK 内 libksud.so）
+      - name: 下载官方 ksud（v1.7.1 release 的 APK 内 libksud.so）
         env:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -130,7 +130,7 @@ jobs:
           set -e
           # 官方 APK 里的 libksud.so 才是与管理器配套的 ksud（支持 plugin 等子命令）；
           # kernel-bundle.zip 里那份较旧，会让"插件"等页面报 unrecognized subcommand
-          URL="https://github.com/LyraVoid/FinaSU/releases/download/v1.7.0/FinaSU_v1.7.0_33224-release.apk"
+          URL="https://github.com/LyraVoid/FinaSU/releases/download/v1.7.1/FinaSU_v1.7.1_33227-release.apk"
           curl -L --retry 3 -m 600 -o /tmp/kb.apk "$URL"
           ls -lh /tmp/kb.apk
           rm -rf /tmp/kb && mkdir -p /tmp/kb && unzip -q /tmp/kb.apk 'lib/*' -d /tmp/kb
